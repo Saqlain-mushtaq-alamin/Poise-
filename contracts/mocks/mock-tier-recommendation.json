@@ -1,0 +1,13 @@
+{
+  "recommended_tier": "local_full",
+  "reason": "Detected 7.0GB free VRAM (>=8GB threshold).",
+  "available_tiers": ["cloud_assist", "local_lite", "local_full"],
+  "model_plan": {
+    "llm": "qwen2.5:14b-instruct-q4_K_M",
+    "vlm": "qwen2-vl:7b-q4",
+    "stt": "large-v3",
+    "tts": "xtts-v2",
+    "embedding": "nomic-embed-text"
+  },
+  "warnings": []
+}
