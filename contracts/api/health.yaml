@@ -1,0 +1,22 @@
+openapi: 3.0.3
+info:
+  title: Poise Health API
+  version: 0.1.0
+  description: Phase 1 — sidecar readiness contract used by the Tauri shell.
+paths:
+  /health:
+    get:
+      summary: Sidecar health check
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, version, database, uptime_seconds]
+                properties:
+                  status: { type: string, enum: [ok] }
+                  version: { type: string, example: "0.1.0" }
+                  database: { type: string, enum: [connected, disconnected] }
+                  uptime_seconds: { type: number }
