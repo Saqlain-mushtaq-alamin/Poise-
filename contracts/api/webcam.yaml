@@ -1,0 +1,10 @@
+openapi: 3.0.3
+info:
+  title: Poise Webcam API
+  version: 0.0.0
+  description: >
+    Stub contract — owned by the developer assigned to this phase. Define
+    the real paths/schemas here before writing the corresponding router in
+    backend/app/routers/webcam.py, so parallel phases can code against this
+    file with mock data (see contracts/mocks/) instead of a running server.
+paths: {}
