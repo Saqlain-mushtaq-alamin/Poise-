@@ -1,0 +1,47 @@
+openapi: 3.0.3
+info:
+  title: Poise Settings API
+  version: 0.1.0
+  description: Phase 1 — generic key/value settings, backing the theme toggle.
+paths:
+  /settings/{key}:
+    get:
+      summary: Read a setting
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Current value (null if unset)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  value: { type: string, nullable: true }
+    put:
+      summary: Write a setting
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Value after write
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  value: { type: string, nullable: true }
