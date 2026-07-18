@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Poise Tauri IPC Events",
+  "description": "Events emitted from src-tauri via AppHandle::emit and consumed in the frontend via @tauri-apps/api/event's listen().",
+  "events": {
+    "sidecar-status": {
+      "description": "Pushed whenever the sidecar's health-check loop observes a state change. See src-tauri/src/sidecar.rs and frontend/src/lib/ipc.ts (onSidecarStatusChange).",
+      "payload": {
+        "type": "object",
+        "required": ["port", "status", "uptime_seconds", "restart_count"],
+        "properties": {
+          "port": { "type": "integer", "minimum": 0 },
+          "status": {
+            "type": "string",
+            "enum": ["starting", "healthy", "unhealthy", "stopped"]
+          },
+          "uptime_seconds": { "type": "number", "minimum": 0 },
+          "restart_count": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}
