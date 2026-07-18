@@ -1,0 +1,82 @@
+openapi: 3.0.3
+info:
+  title: Poise Hardware API
+  version: 0.2.0
+  description: Phase 2 — hardware detection + tier assignment.
+components:
+  schemas:
+    GPUInfo:
+      type: object
+      properties:
+        name: { type: string }
+        vram_total_mb: { type: integer }
+        vram_available_mb: { type: integer }
+        driver: { type: string, enum: [nvidia, amd, apple, intel] }
+        compute_capability: { type: string, nullable: true }
+    HardwareProfile:
+      type: object
+      properties:
+        os: { type: string, enum: [windows, macos, linux] }
+        cpu_cores: { type: integer }
+        cpu_name: { type: string }
+        ram_total_gb: { type: number }
+        ram_available_gb: { type: number }
+        gpus: { type: array, items: { $ref: '#/components/schemas/GPUInfo' } }
+        docker_available: { type: boolean }
+        ollama_available: { type: boolean }
+        ollama_models: { type: array, items: { type: string } }
+    ModelPlan:
+      type: object
+      properties:
+        llm: { type: string }
+        vlm: { type: string, nullable: true }
+        stt: { type: string }
+        tts: { type: string }
+        embedding: { type: string }
+    TierRecommendation:
+      type: object
+      properties:
+        recommended_tier: { type: string, enum: [local_full, local_lite, cloud_assist] }
+        reason: { type: string }
+        available_tiers:
+          type: array
+          items: { type: string, enum: [local_full, local_lite, cloud_assist] }
+        model_plan: { $ref: '#/components/schemas/ModelPlan' }
+        warnings: { type: array, items: { type: string } }
+paths:
+  /hardware/profile:
+    get:
+      summary: Get detected hardware profile
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HardwareProfile' }
+  /hardware/tier:
+    get:
+      summary: Get current tier assignment (recommended, or persisted override)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TierRecommendation' }
+    put:
+      summary: Override tier manually
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tier: { type: string, enum: [local_full, local_lite, cloud_assist] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TierRecommendation' }
+        '400':
+          description: Requested tier isn't available on this hardware
