@@ -1,0 +1,19 @@
+[project]
+name = "poise-backend"
+version = "0.1.0"
+description = "Poise FastAPI sidecar"
+requires-python = ">=3.10"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# B008: FastAPI's Depends()/Query()-in-default-argument pattern is the
+# documented, idiomatic way to declare dependencies — not a real bug here.
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
