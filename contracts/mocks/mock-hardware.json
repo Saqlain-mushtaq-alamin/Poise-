@@ -1,0 +1,19 @@
+{
+  "os": "windows",
+  "cpu_cores": 12,
+  "cpu_name": "AMD Ryzen 9 7900X",
+  "ram_total_gb": 32.0,
+  "ram_available_gb": 20.5,
+  "gpus": [
+    {
+      "name": "NVIDIA GeForce RTX 4060",
+      "vram_total_mb": 8188,
+      "vram_available_mb": 7200,
+      "driver": "nvidia",
+      "compute_capability": "8.9"
+    }
+  ],
+  "docker_available": true,
+  "ollama_available": true,
+  "ollama_models": ["qwen2.5:7b-instruct-q4_K_M"]
+}
