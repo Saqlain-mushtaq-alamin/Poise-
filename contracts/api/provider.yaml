@@ -1,0 +1,85 @@
+openapi: 3.0.3
+info:
+  title: Poise Provider API
+  version: 0.2.0
+  description: Phase 2 — model provider status, BYOK keys, and cost tracking.
+paths:
+  /provider/status:
+    get:
+      summary: Current provider health and configuration
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tier: { type: string, enum: [local_full, local_lite, cloud_assist] }
+                  model_plan: { type: object }
+                  configured_providers: { type: array, items: { type: string } }
+                  ollama_reachable: { type: boolean }
+  /provider/cost:
+    get:
+      summary: Current session cost estimate
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  input_tokens: { type: integer }
+                  output_tokens: { type: integer }
+                  total_tokens: { type: integer }
+                  estimated_cost_usd: { type: number }
+                  soft_cap_tokens: { type: integer }
+                  soft_cap_usd: { type: number }
+                  cap_warning: { type: boolean }
+  /provider/cost/cap:
+    put:
+      summary: Update the per-session soft cost cap
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                soft_cap_tokens: { type: integer }
+                soft_cap_usd: { type: number }
+      responses:
+        '200': { description: OK }
+  /provider/keys/{provider}:
+    put:
+      summary: >
+        Set an in-memory API key for a provider. Called by the Rust side
+        after reading the key from the OS keychain — see
+        src-tauri/src/keychain.rs. Never persisted to disk by this process.
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { type: string, enum: [openai, anthropic, google, groq, custom] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                key: { type: string }
+                base_url: { type: string, nullable: true }
+      responses:
+        '200': { description: Stored }
+        '400': { description: Unknown provider }
+    delete:
+      summary: Clear an in-memory API key
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Cleared }
