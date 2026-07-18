@@ -1,0 +1,36 @@
+# Node
+node_modules/
+dist/
+frontend/dist/
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/binaries/
+src-tauri/gen/
+
+# Python
+backend/.venv/
+backend/**/__pycache__/
+backend/build/
+*.pyc
+
+# Data / DB
+*.db
+*.db-journal
+
+# Env
+.env
+.env.local
+
+# Editor / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+
+# Test artifacts
+e2e/test-results/
+e2e/playwright-report/
+coverage/
+
+planning
+
