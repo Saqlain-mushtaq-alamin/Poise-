@@ -1,0 +1,64 @@
+openapi: 3.0.3
+info:
+  title: Poise First-Run Wizard API
+  version: 0.2.0
+  description: Phase 2 — guided setup flow. See backend/app/routers/setup.py.
+paths:
+  /setup/detect-hardware:
+    post:
+      summary: Run hardware detection
+      responses:
+        '200': { description: HardwareProfile — see contracts/api/hardware.yaml }
+  /setup/recommend-tier:
+    post:
+      summary: Detect hardware and recommend a tier
+      responses:
+        '200': { description: TierRecommendation — see contracts/api/hardware.yaml }
+  /setup/configure-tier:
+    post:
+      summary: Persist the user's chosen tier and reconfigure the provider router
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tier:
+                  type: object
+                  properties:
+                    tier: { type: string, enum: [local_full, local_lite, cloud_assist] }
+      responses:
+        '200': { description: '{ tier, model_plan }' }
+        '400': { description: Requested tier unavailable on this hardware }
+  /setup/download-models:
+    post:
+      summary: SSE stream of Ollama model pull progress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                models: { type: array, items: { type: string } }
+      responses:
+        '200':
+          description: text/event-stream of `{model, status, ...}` frames
+  /setup/store-api-key:
+    post:
+      summary: Store a BYOK key in the running sidecar (dev/fallback path — the
+        production path is the Tauri keychain command, which also calls this)
+      responses:
+        '200': { description: '{ provider, status }' }
+        '400': { description: Unknown provider }
+  /setup/test-connection:
+    post:
+      summary: Validate a provider key and measure latency
+      responses:
+        '200': { description: '{ provider, success, latency_ms, models_available, error? }' }
+  /setup/run-smoke-test:
+    post:
+      summary: Send one trivial chat completion through the active tier/provider
+      responses:
+        '200': { description: '{ success, latency_ms, sample_output, error? }' }
