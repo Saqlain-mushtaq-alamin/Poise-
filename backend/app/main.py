@@ -70,7 +70,7 @@ def run() -> None:
     print(f"POISE_SIDECAR_PORT={port}", flush=True)
 
     uvicorn.run(
-        "app.main:app",
+        app,
         host=settings.host,
         port=port,
         log_level=settings.log_level,
