@@ -1,0 +1,19 @@
+/* Default theme — premium dark. */
+:root,
+[data-theme="dark"] {
+  --color-bg-primary: hsl(225, 25%, 8%);
+  --color-bg-secondary: hsl(225, 20%, 12%);
+  --color-bg-elevated: hsl(225, 20%, 16%);
+  --color-surface: hsl(225, 15%, 20%);
+  --color-border: hsl(225, 15%, 24%);
+
+  --color-accent-primary: hsl(250, 90%, 65%);
+  --color-accent-secondary: hsl(190, 85%, 55%);
+  --color-accent-success: hsl(150, 70%, 50%);
+  --color-accent-warning: hsl(40, 90%, 60%);
+  --color-accent-danger: hsl(0, 75%, 60%);
+
+  --color-text-primary: hsl(0, 0%, 95%);
+  --color-text-secondary: hsl(225, 10%, 65%);
+  --color-text-muted: hsl(225, 10%, 45%);
+}
