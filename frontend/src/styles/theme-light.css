@@ -1,0 +1,18 @@
+/* Light theme — same accent hues, inverted surfaces for daylight use. */
+[data-theme="light"] {
+  --color-bg-primary: hsl(220, 30%, 98%);
+  --color-bg-secondary: hsl(220, 25%, 94%);
+  --color-bg-elevated: hsl(0, 0%, 100%);
+  --color-surface: hsl(220, 20%, 90%);
+  --color-border: hsl(220, 15%, 82%);
+
+  --color-accent-primary: hsl(250, 75%, 55%);
+  --color-accent-secondary: hsl(190, 75%, 40%);
+  --color-accent-success: hsl(150, 60%, 38%);
+  --color-accent-warning: hsl(38, 85%, 45%);
+  --color-accent-danger: hsl(0, 70%, 50%);
+
+  --color-text-primary: hsl(225, 25%, 12%);
+  --color-text-secondary: hsl(225, 15%, 35%);
+  --color-text-muted: hsl(225, 10%, 52%);
+}
