@@ -1,0 +1,32 @@
+{
+  "session_id": "demo",
+  "frames": [
+    {
+      "timestamp_ms": 0,
+      "eye_contact": { "direction": "direct", "confidence": 0.9, "contact_ratio_30s": 0.8 },
+      "head_stability": { "pitch": 0, "yaw": 0, "roll": 0, "stability_score": 0.9, "movement_pattern": "stable" },
+      "blink_rate": { "ear_left": 0.3, "ear_right": 0.3, "is_blinking": false, "blinks_per_minute": 16, "assessment": "normal" },
+      "expression": "focused",
+      "composite_score": 88
+    },
+    {
+      "timestamp_ms": 500,
+      "eye_contact": { "direction": "away_left", "confidence": 0.7, "contact_ratio_30s": 0.5 },
+      "head_stability": { "pitch": 0, "yaw": 10, "roll": 0, "stability_score": 0.6, "movement_pattern": "fidgeting" },
+      "blink_rate": { "ear_left": 0.15, "ear_right": 0.15, "is_blinking": true, "blinks_per_minute": 30, "assessment": "elevated" },
+      "expression": "anxious",
+      "composite_score": 45
+    }
+  ],
+  "summary": {
+    "avg_eye_contact_ratio": 0.65,
+    "avg_stability_score": 0.75,
+    "avg_blink_rate": 23.0,
+    "dominant_expression": "focused",
+    "composite_score": 66.5,
+    "notable_moments": [
+      { "timestamp_ms": 500, "description": "Confidence dropped 43 points (from 88 to 45)", "composite_score": 45.0 }
+    ],
+    "frame_count": 2
+  }
+}
