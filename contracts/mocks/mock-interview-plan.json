@@ -1,0 +1,22 @@
+{
+  "sections": [
+    {
+      "type": "behavioral",
+      "title": "Behavioral",
+      "time_budget_minutes": 10,
+      "questions": [
+        {
+          "id": "q1",
+          "text": "Tell me about a time you had to debug a production issue under pressure.",
+          "follow_ups": [],
+          "evaluation_criteria": ["ownership", "specificity", "communication"],
+          "difficulty": "medium",
+          "skills_tested": ["incident response"],
+          "source": "resume_gap"
+        }
+      ]
+    }
+  ],
+  "estimated_duration_minutes": 15,
+  "coverage_matrix": { "incident response": ["q1"] }
+}
