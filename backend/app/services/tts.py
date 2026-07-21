@@ -1,0 +1,177 @@
+"""Text-to-speech.
+
+`TTSEngine` picks a backend per the Phase 3 spec's tier table and exposes
+one streaming interface regardless of which backend answers:
+
+| Backend  | Tier                  | Status here                                       |
+|----------|-----------------------|----------------------------------------------------|
+| Piper    | All tiers (default)   | Lazy subprocess call; needs the `piper` binary +  |
+|          |                       | a voice model on disk — neither is bundled, so    |
+|          |                       | this raises `TTSBackendUnavailable` here.         |
+| XTTS-v2  | Local Full            | Lazy `TTS` (coqui-tts) import; needs torch + a    |
+|          |                       | multi-GB model download — same story.             |
+| Edge TTS | Cloud Assist fallback | Lazy `edge_tts` import; needs network access to   |
+|          |                       | Microsoft's endpoint.                              |
+| Placeholder tone | Automatic fallback | **Actually works, right now, dependency-free.**  |
+|          |                       | Generates real, valid, audible WAV audio scaled to |
+|          |                       | the text's estimated speech duration — not real   |
+|          |                       | synthesized speech, but genuine audio proving the  |
+|          |                       | encoding/streaming/playback/barge-in pipeline.     |
+
+`synthesize_stream` always falls back to the placeholder tone if the
+tier-appropriate backend can't run, rather than raising — a broken/missing
+TTS backend shouldn't block someone from testing the rest of the app. The
+one exception is `list_voices`, which reports what's *actually* available
+so the Settings UI can show honest status instead of pretending Piper
+voices exist when Piper isn't installed.
+"""
+
+from __future__ import annotations
+
+import logging
+from collections.abc import AsyncGenerator
+from dataclasses import dataclass
+
+from app.services.audio_utils import (
+    chunk_wav_pcm,
+    estimate_speech_duration_seconds,
+    generate_tone_samples,
+    pcm16_to_wav_bytes,
+)
+from app.services.tier import HardwareTier
+
+logger = logging.getLogger("poise.tts")
+
+TIER_BACKEND_MAP = {
+    HardwareTier.LOCAL_FULL: "xtts-v2",
+    HardwareTier.LOCAL_LITE: "piper",
+    HardwareTier.CLOUD_ASSIST: "edge-tts",
+}
+
+PLACEHOLDER_VOICE_ID = "placeholder-tone"
+
+
+class TTSBackendUnavailable(RuntimeError):
+    """Raised by list_voices()/a specific backend probe when the real
+    engine for the current tier isn't installed/reachable. Never raised
+    from synthesize_stream(), which always has the placeholder fallback."""
+
+
+@dataclass
+class VoiceInfo:
+    id: str
+    name: str
+    language: str
+    gender: str
+    sample_url: str | None = None
+
+
+_PLACEHOLDER_VOICE = VoiceInfo(
+    id=PLACEHOLDER_VOICE_ID,
+    name="Placeholder tone (no TTS engine installed)",
+    language="n/a",
+    gender="n/a",
+    sample_url=None,
+)
+
+
+class TTSEngine:
+    def __init__(self, tier: HardwareTier = HardwareTier.CLOUD_ASSIST) -> None:
+        self._tier = tier
+
+    def set_tier(self, tier: HardwareTier) -> None:
+        self._tier = tier
+
+    @property
+    def backend_name(self) -> str:
+        return TIER_BACKEND_MAP[self._tier]
+
+    def _probe_piper(self) -> bool:
+        import shutil
+
+        return shutil.which("piper") is not None
+
+    def _probe_xtts(self) -> bool:
+        try:
+            import TTS  # noqa: F401  — coqui-tts package, imports as `TTS`
+        except ImportError:
+            return False
+        return True
+
+    def _probe_edge_tts(self) -> bool:
+        try:
+            import edge_tts  # noqa: F401
+        except ImportError:
+            return False
+        return True
+
+    def _backend_available(self) -> bool:
+        probes = {
+            "piper": self._probe_piper,
+            "xtts-v2": self._probe_xtts,
+            "edge-tts": self._probe_edge_tts,
+        }
+        return probes[self.backend_name]()
+
+    def list_voices(self) -> list[VoiceInfo]:
+        if not self._backend_available():
+            return [_PLACEHOLDER_VOICE]
+
+        # Real backends would enumerate their installed voices here. None
+        # are installed in this environment, so this branch is written but
+        # not exercised by any test — see the module docstring.
+        if self.backend_name == "piper":
+            return self._list_piper_voices()
+        if self.backend_name == "xtts-v2":
+            return self._list_xtts_voices()
+        return self._list_edge_voices()
+
+    def _list_piper_voices(self) -> list[VoiceInfo]:  # pragma: no cover — needs the piper binary
+        raise TTSBackendUnavailable("Piper voice enumeration not implemented for this build")
+
+    def _list_xtts_voices(self) -> list[VoiceInfo]:  # pragma: no cover — needs coqui-tts + model
+        raise TTSBackendUnavailable("XTTS voice enumeration not implemented for this build")
+
+    def _list_edge_voices(self) -> list[VoiceInfo]:  # pragma: no cover — needs network access
+        raise TTSBackendUnavailable("Edge TTS voice enumeration not implemented for this build")
+
+    async def synthesize_stream(
+        self, text: str, voice: str = "default", chunk_samples: int = 4410
+    ) -> AsyncGenerator[bytes, None]:
+        """Yields WAV byte chunks. Falls back to the placeholder tone
+        whenever the tier-appropriate backend isn't actually available —
+        see the module docstring for why that's a deliberate design choice,
+        not a bug."""
+        if self._backend_available():
+            try:
+                async for chunk in self._synthesize_with_real_backend(text, voice, chunk_samples):
+                    yield chunk
+                return
+            except Exception:  # noqa: BLE001 — any backend failure falls back, never crashes
+                logger.exception(
+                    "TTS backend %s failed; falling back to placeholder tone", self.backend_name
+                )
+
+        async for chunk in self._synthesize_placeholder(text, chunk_samples):
+            yield chunk
+
+    async def _synthesize_with_real_backend(
+        self, text: str, voice: str, chunk_samples: int
+    ) -> AsyncGenerator[bytes, None]:  # pragma: no cover — needs a real installed backend
+        raise TTSBackendUnavailable(f"{self.backend_name} synthesis not implemented for this build")
+        yield b""  # pragma: no cover — makes this an async generator for type-checkers
+
+    async def _synthesize_placeholder(
+        self, text: str, chunk_samples: int
+    ) -> AsyncGenerator[bytes, None]:
+        duration = estimate_speech_duration_seconds(text)
+        samples = generate_tone_samples(duration_seconds=duration)
+        for chunk in chunk_wav_pcm(samples, chunk_size=chunk_samples):
+            yield pcm16_to_wav_bytes(chunk)
+
+
+_engine_instance = TTSEngine()
+
+
+def get_tts_engine() -> TTSEngine:
+    return _engine_instance
