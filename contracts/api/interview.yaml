@@ -1,10 +1,108 @@
 openapi: 3.0.3
 info:
-  title: Poise Interview API
-  version: 0.0.0
-  description: >
-    Stub contract — owned by the developer assigned to this phase. Define
-    the real paths/schemas here before writing the corresponding router in
-    backend/app/routers/interview.py, so parallel phases can code against this
-    file with mock data (see contracts/mocks/) instead of a running server.
-paths: {}
+  title: Poise Interview Engine API
+  version: 0.4.0
+  description: Phase 4 — resume/JD ingestion, plan generation, and the full session lifecycle.
+paths:
+  /interview/parse-resume:
+    post:
+      summary: Upload + parse a resume (multipart/form-data, field name "file"; .pdf/.docx)
+      responses:
+        '200': { description: '{ resume_id, resume: ResumeData }' }
+        '400': { description: Unsupported file type }
+        '502': { description: LLM structuring failed / returned malformed output }
+  /interview/parse-jd:
+    post:
+      summary: Parse raw job description text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { text: { type: string } } }
+      responses:
+        '200': { description: '{ jd_id, job_description: JobDescription }' }
+        '502': { description: LLM structuring failed }
+  /interview/generate-plan:
+    post:
+      summary: Preview a generated interview plan without creating a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                resume_id: { type: string }
+                jd_id: { type: string }
+                config: { type: object, description: InterviewConfig }
+      responses:
+        '200': { description: InterviewPlan }
+        '404': { description: Unknown resume_id or jd_id }
+        '502': { description: LLM plan generation failed }
+  /interview/personas:
+    get:
+      summary: List available interviewer personas
+      responses:
+        '200': { description: Persona[] }
+  /interview/company-formats:
+    get:
+      summary: List available company-specific interview formats
+      responses:
+        '200': { description: CompanyFormat[] }
+  /interview/sessions:
+    post:
+      summary: Create a session (generates a plan if none is provided) and advance it to "ready"
+      responses:
+        '200': { description: '{ session_id, state, persona_id, session_mode, plan }' }
+        '400': { description: Unknown persona_id, company_format, or unavailable tier for the requested round }
+        '404': { description: Unknown resume_id or jd_id }
+  /interview/sessions/{session_id}:
+    get:
+      summary: Get current session state + plan
+      responses:
+        '200': { description: SessionResponse }
+        '404': { description: Unknown session_id }
+  /interview/sessions/{session_id}/start:
+    post:
+      summary: Begin the interview — transitions ready -> warm_up, returns the opening greeting
+      responses:
+        '200': { description: '{ message, is_complete: false }' }
+        '400': { description: Invalid state for this transition }
+  /interview/sessions/{session_id}/warmup-respond:
+    post:
+      summary: >
+        Respond during the warm-up small-talk phase. Once the 4-stage flow
+        completes, the response also includes the first real question and
+        the session transitions into in_progress.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { text: { type: string } } }
+      responses:
+        '200': { description: '{ message, is_complete, first_question?, question_id? }' }
+  /interview/sessions/{session_id}/answer:
+    post:
+      summary: Submit an answer to the current (or follow-up) question
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { text: { type: string } } }
+      responses:
+        '200':
+          description: >
+            '{ score, feedback, reaction, next_action: follow_up|next_question|session_complete,
+            next_message?, next_question_id?, framework_missing }'
+        '400': { description: No open question awaiting an answer, or invalid state }
+  /interview/sessions/{session_id}/end:
+    post:
+      summary: Manually end the session, running it through wrapping_up -> closing_chat -> completed
+      responses:
+        '200': { description: SessionResponse (state == completed, or unchanged if not yet started) }
+  /interview/sessions/{session_id}/evaluations:
+    get:
+      summary: All question/follow-up turns with their evaluations — Phase 8's input
+      responses:
+        '200': { description: EvaluationRecord[] }
+        '404': { description: Unknown session_id }
