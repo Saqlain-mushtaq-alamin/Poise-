@@ -1,21 +1,47 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { useLocation } from "react-router-dom";
 
+import { useConfidenceTracking } from "../hooks/useConfidenceTracking";
+import type { PoiseAPI } from "../lib/api";
 import type { SidecarStatus } from "../lib/types";
+import { CoachingToast } from "./vision/CoachingToast";
+import { ConfidenceOverlay } from "./vision/ConfidenceOverlay";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 
 interface ShellProps {
   children: ReactNode;
   sidecarStatus: SidecarStatus | null;
+  api: PoiseAPI | null;
 }
 
 /** Top-level layout every page renders inside. Owns the sidebar, the
- * page-transition animation, the status bar, and a reserved slot below the
- * content area for Phase 5's webcam overlay. */
-export function Shell({ children, sidecarStatus }: ShellProps) {
+ * page-transition animation, the status bar, and the Phase 5 webcam
+ * confidence overlay — mounted here (rather than per-page) so it can
+ * render above any page without each page needing to know about it. Off
+ * by default: starting it requests camera access, which shouldn't happen
+ * without the person explicitly asking for it. */
+export function Shell({ children, sidecarStatus, api }: ShellProps) {
   const location = useLocation();
+  const [webcamEnabled, setWebcamEnabled] = useState(false);
+  const [overlayVisible, setOverlayVisible] = useState(true);
+
+  const confidence = useConfidenceTracking({
+    api,
+    sessionId: null, // wired up to the active interview session once Phase 4 + 5 are integrated
+    coachingEnabled: true,
+  });
+
+  function handleToggleWebcam() {
+    if (webcamEnabled) {
+      confidence.stop();
+      setWebcamEnabled(false);
+    } else {
+      setWebcamEnabled(true);
+      void confidence.start();
+    }
+  }
 
   return (
     <div className="shell">
@@ -37,10 +63,26 @@ export function Shell({ children, sidecarStatus }: ShellProps) {
           </AnimatePresence>
         </div>
 
-        {/* Phase 5 (Webcam Analysis) mounts its always-on confidence overlay
-            here so it can render above any page without each page needing
-            to know about it. Empty until then. */}
-        <div id="webcam-overlay-slot" className="shell__webcam-slot" />
+        <div id="webcam-overlay-slot" className="shell__webcam-slot">
+          <button type="button" className="shell__webcam-toggle" onClick={handleToggleWebcam}>
+            {webcamEnabled ? "Turn off confidence tracking" : "Turn on confidence tracking"}
+          </button>
+
+          {webcamEnabled && confidence.latestResult && (
+            <ConfidenceOverlay
+              score={confidence.latestResult.compositeScore}
+              eyeContactRatio={confidence.latestResult.eyeContact.contact_ratio_30s}
+              expression={confidence.latestResult.expression}
+              gestureAssessment={confidence.latestResult.gesture?.assessment}
+              visible={overlayVisible}
+              onToggleVisible={() => setOverlayVisible((v) => !v)}
+            />
+          )}
+
+          {webcamEnabled && (
+            <CoachingToast tip={confidence.coachingTip} onDismiss={confidence.dismissTip} />
+          )}
+        </div>
 
         <StatusBar sidecarStatus={sidecarStatus} />
       </div>
