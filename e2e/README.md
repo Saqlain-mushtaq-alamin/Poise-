@@ -17,6 +17,15 @@ Settings-page tests exercise real hardware detection rather than mocks.
 Make sure `backend/.venv` exists first (`cd backend && python -m venv .venv
 && pip install -r requirements.txt`).
 
+`voice-settings.spec.ts` additionally relies on Chromium's
+`--use-fake-ui-for-media-stream` / `--use-fake-device-for-media-stream`
+launch flags (already set in `playwright.config.ts`) so mic capture works
+headlessly, without a real audio device or a permission-prompt click. None
+of the Playwright specs in this repo have actually been run in the
+environment this scaffold was built in — the browser binaries
+`playwright install` downloads aren't fetchable there. Run them yourself
+as the first real check of the full stack.
+
 ## Driving the real Tauri window (optional, closer to production)
 
 To test against the compiled desktop window instead of a browser tab, use
