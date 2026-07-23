@@ -98,3 +98,34 @@ export interface CostEstimate {
   soft_cap_usd: number;
   cap_warning: boolean;
 }
+
+// ---- Phase 3: voice pipeline ----
+
+export interface VoiceInfo {
+  id: string;
+  name: string;
+  language: string;
+  gender: string;
+  sample_url: string | null;
+}
+
+export interface AudioDeviceInfo {
+  id: string;
+  name: string;
+  is_default: boolean;
+}
+
+export interface VadStatusMessage {
+  is_speech: boolean;
+  probability: number;
+  timestamp_ms: number;
+}
+
+export interface TranscriptionSegmentMessage {
+  text: string;
+  start_ms: number;
+  end_ms: number;
+  confidence: number;
+  is_partial: boolean;
+  language: string | null;
+}
