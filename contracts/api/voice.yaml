@@ -1,10 +1,110 @@
 openapi: 3.0.3
 info:
   title: Poise Voice API
-  version: 0.0.0
+  version: 0.3.0
   description: >
-    Stub contract — owned by the developer assigned to this phase. Define
-    the real paths/schemas here before writing the corresponding router in
-    backend/app/routers/voice.py, so parallel phases can code against this
-    file with mock data (see contracts/mocks/) instead of a running server.
-paths: {}
+    Phase 3 — STT/TTS/VAD. Two endpoints are WebSockets, which OpenAPI 3.0
+    doesn't model natively; their framing is documented in the `description`
+    fields below and mirrors backend/app/routers/voice.py exactly.
+components:
+  schemas:
+    VoiceInfo:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        language: { type: string }
+        gender: { type: string }
+        sample_url: { type: string, nullable: true }
+    AudioDeviceInfo:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        is_default: { type: boolean }
+    VadStatusMessage:
+      type: object
+      description: One JSON message per PCM16 frame received on /voice/vad/status.
+      properties:
+        is_speech: { type: boolean }
+        probability: { type: number }
+        timestamp_ms: { type: integer }
+    TranscriptionSegmentMessage:
+      type: object
+      description: One JSON message per buffered window on /voice/stt/stream.
+      properties:
+        text: { type: string }
+        start_ms: { type: integer }
+        end_ms: { type: integer }
+        confidence: { type: number }
+        is_partial: { type: boolean }
+        language: { type: string, nullable: true }
+paths:
+  /voice/tts/synthesize:
+    post:
+      summary: Synthesize text to speech, streamed as WAV chunks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text: { type: string }
+                voice: { type: string, default: default }
+                stream: { type: boolean, default: true }
+      responses:
+        '200':
+          description: audio/wav byte stream (each internal chunk is itself a valid WAV file)
+          content:
+            audio/wav: {}
+  /voice/tts/voices:
+    get:
+      summary: List available TTS voices
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/VoiceInfo' }
+  /voice/devices:
+    get:
+      summary: >
+        List host-level audio input devices (backend recording fallback
+        only — the frontend's mic device picker uses navigator.mediaDevices
+        directly)
+      responses:
+        '200':
+          description: OK (empty array if no audio subsystem/`sounddevice` available)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AudioDeviceInfo' }
+  /voice/vad/status:
+    description: >
+      WebSocket. Client sends binary PCM16 mono frames (480 samples / 30ms
+      each, matching backend/app/services/vad.py's SAMPLES_PER_CHUNK).
+      Server replies with one VadStatusMessage JSON frame per binary frame
+      received. Closes on client disconnect.
+    get:
+      summary: (WebSocket handshake — see description)
+      responses:
+        '101': { description: Switching Protocols }
+  /voice/stt/stream:
+    description: >
+      WebSocket. Client sends binary PCM16 mono frames continuously.
+      Server buffers them into ~2-second windows and replies with one
+      TranscriptionSegmentMessage per window (is_partial=true until the
+      client disconnects, at which point a final is_partial=false segment
+      is sent for any remaining buffered audio). If the tier's Whisper
+      model isn't available, the server sends
+      `{"error": "...", "model_name": "..."}` instead of segments and
+      closes the socket — see ModelNotAvailableError in backend/app/
+      services/stt.py.
+    get:
+      summary: (WebSocket handshake — see description)
+      responses:
+        '101': { description: Switching Protocols }
