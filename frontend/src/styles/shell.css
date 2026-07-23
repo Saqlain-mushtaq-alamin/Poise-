@@ -105,8 +105,21 @@
   padding: var(--space-8);
 }
 
-.shell__webcam-slot:empty {
-  display: none;
+.shell__webcam-slot {
+  position: fixed;
+  bottom: var(--space-6);
+  left: var(--space-6);
+  z-index: 40;
+}
+
+.shell__webcam-toggle {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+  font-size: 0.8rem;
 }
 
 .status-bar {
@@ -429,4 +442,272 @@
 
 .cost-slider__current--warning {
   color: var(--color-accent-warning);
+}
+
+/* --- Phase 3: audio settings --- */
+
+.audio-settings__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.audio-settings__row:first-of-type {
+  border-top: none;
+}
+
+.audio-settings__row select,
+.audio-settings__row input[type="range"] {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  max-width: 320px;
+}
+
+.audio-settings__meter {
+  width: 100%;
+  max-width: 320px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.audio-settings__meter-fill {
+  height: 100%;
+  transition: width 80ms linear;
+}
+
+.audio-settings__meter-fill--low {
+  background: var(--color-accent-success);
+}
+
+.audio-settings__meter-fill--mid {
+  background: var(--color-accent-warning);
+}
+
+.audio-settings__meter-fill--high {
+  background: var(--color-accent-danger);
+}
+
+.audio-settings__voice-picker {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.audio-settings__voice-picker button {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+}
+
+.audio-settings__test {
+  padding-top: var(--space-4);
+}
+
+.audio-settings__test button {
+  background: var(--color-accent-primary);
+  border: none;
+  color: white;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+}
+
+.audio-settings__turn-state {
+  margin-left: var(--space-2);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.audio-settings__transcript {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+}
+
+/* --- Phase 4: interview setup + room --- */
+
+.interview-room {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.interview-room__transcript {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  min-height: 120px;
+}
+
+.interview-room__message {
+  font-size: 1.05rem;
+  margin: 0 0 var(--space-3);
+}
+
+.interview-room__feedback {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.interview-room__input textarea {
+  width: 100%;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  font-family: inherit;
+  resize: vertical;
+}
+
+.interview-room__actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.interview-room__actions button {
+  background: var(--color-accent-primary);
+  border: none;
+  color: white;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+}
+
+.interview-room__actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.interview-room__end {
+  background: transparent !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-text-secondary) !important;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+/* --- Phase 5: confidence overlay + coaching toast --- */
+
+.confidence-overlay {
+  position: fixed;
+  bottom: var(--space-6);
+  right: var(--space-6);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  z-index: 40;
+}
+
+.confidence-overlay--minimized {
+  padding: var(--space-2);
+}
+
+.confidence-overlay__gauge-wrap {
+  position: relative;
+  width: 64px;
+  height: 64px;
+}
+
+.confidence-overlay__score {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--color-text-primary);
+}
+
+.confidence-overlay__indicators {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.confidence-overlay__controls {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.confidence-overlay__controls button {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  font-size: 0.7rem;
+}
+
+.confidence-overlay__reopen {
+  position: fixed;
+  bottom: var(--space-6);
+  right: var(--space-6);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+  z-index: 40;
+}
+
+.coaching-toast {
+  position: fixed;
+  bottom: var(--space-6);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-md);
+  max-width: 360px;
+  z-index: 50;
+}
+
+.coaching-toast--important {
+  border-color: var(--color-accent-warning);
+}
+
+.coaching-toast__message {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-primary);
+}
+
+.coaching-toast__exercise {
+  margin: var(--space-2) 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
 }
