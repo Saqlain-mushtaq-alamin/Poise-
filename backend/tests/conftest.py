@@ -25,6 +25,15 @@ def client(isolated_data_dir):
     # `app.database` binds a module-level `engine` at import time from
     # cached Settings. Drop every `app.*` module so each test gets a fresh
     # engine bound to its own isolated_data_dir instead of a stale one.
+    #
+    # PITFALL this creates: any `app.*` class imported *inside a test
+    # function body* (rather than at module top level) after this fixture
+    # has already run once in the same test session will be a *different*
+    # class object than the one modules imported at collection time are
+    # using — `isinstance`/`pytest.raises` checks against it will then
+    # silently fail to match. Always import `app.*` names you'll use in
+    # `pytest.raises(...)` or other identity/isinstance checks at the top
+    # of the test file, never inside the test function.
     for mod in [m for m in sys.modules if m == "app" or m.startswith("app.")]:
         del sys.modules[mod]
 
