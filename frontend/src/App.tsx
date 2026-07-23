@@ -18,13 +18,16 @@ export function App() {
   return (
     <ThemeProvider api={api}>
       <HashRouter>
-        <Shell sidecarStatus={status}>
+        <Shell sidecarStatus={status} api={api}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/interview" element={<InterviewSetup />} />
+            <Route path="/interview" element={<InterviewSetup api={api} />} />
             <Route path="/ielts" element={<IELTSSetup />} />
             <Route path="/history" element={<History />} />
-            <Route path="/settings" element={<Settings api={api} />} />
+            <Route
+              path="/settings"
+              element={<Settings api={api} sidecarPort={status?.port ?? null} />}
+            />
           </Routes>
         </Shell>
       </HashRouter>
