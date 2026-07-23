@@ -27,5 +27,14 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:1420",
     trace: "retain-on-failure",
+    // Auto-grants mic permission and feeds a synthetic tone instead of a
+    // real microphone — needed for e2e/tests/voice-settings.spec.ts to run
+    // in CI without a physical audio device or a permission-prompt click.
+    launchOptions: {
+      args: [
+        "--use-fake-ui-for-media-stream",
+        "--use-fake-device-for-media-stream",
+      ],
+    },
   },
 });
