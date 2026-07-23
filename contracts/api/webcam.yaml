@@ -1,10 +1,93 @@
 openapi: 3.0.3
 info:
-  title: Poise Webcam API
-  version: 0.0.0
+  title: Poise Webcam Confidence API
+  version: 0.5.0
   description: >
-    Stub contract — owned by the developer assigned to this phase. Define
-    the real paths/schemas here before writing the corresponding router in
-    backend/app/routers/webcam.py, so parallel phases can code against this
-    file with mock data (see contracts/mocks/) instead of a running server.
-paths: {}
+    Phase 5 — confidence signal ingestion + aggregation. Runs in complete
+    isolation: session_id is a plain grouping key, not a foreign key to
+    any other table. Raw video never leaves the browser; only numerical
+    signals (this schema) are ever sent here.
+components:
+  schemas:
+    ConfidenceFrame:
+      type: object
+      properties:
+        timestamp_ms: { type: integer }
+        eye_contact:
+          type: object
+          properties:
+            direction: { type: string, enum: [direct, away_left, away_right, down, up] }
+            confidence: { type: number }
+            contact_ratio_30s: { type: number }
+        head_stability:
+          type: object
+          properties:
+            pitch: { type: number }
+            yaw: { type: number }
+            roll: { type: number }
+            stability_score: { type: number }
+            movement_pattern: { type: string, enum: [stable, nodding, shaking, fidgeting] }
+        blink_rate:
+          type: object
+          properties:
+            ear_left: { type: number }
+            ear_right: { type: number }
+            is_blinking: { type: boolean }
+            blinks_per_minute: { type: number }
+            assessment: { type: string, enum: [normal, elevated, low] }
+        gesture:
+          type: object
+          nullable: true
+          properties:
+            hand_position: { type: string, enum: [resting, gesturing, face_touching, fidgeting, crossed_arms] }
+            gesture_frequency: { type: number }
+            assessment: { type: string, enum: [natural, too_still, excessive, defensive] }
+        expression: { type: string, enum: [neutral, happy, surprised, confused, anxious, focused] }
+        composite_score: { type: number, description: "0-100 weighted composite" }
+paths:
+  /webcam/session/{session_id}/frames:
+    post:
+      summary: Batch-submit confidence frames (from frontend analysis)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { $ref: '#/components/schemas/ConfidenceFrame' }
+      responses:
+        '200': { description: '{ session_id, frames_stored }' }
+  /webcam/session/{session_id}/timeline:
+    get:
+      summary: Full confidence timeline (all frames + computed summary) for a session
+      responses:
+        '200': { description: 'ConfidenceTimeline: { session_id, frames, summary }' }
+        '404': { description: No frames stored for this session yet }
+  /webcam/session/{session_id}/summary:
+    get:
+      summary: Computed confidence summary for a session
+      responses:
+        '200': { description: ConfidenceSummary }
+        '404': { description: No frames stored for this session yet }
+  /webcam/session/{session_id}/baseline-comparison:
+    get:
+      summary: Compare warm-up (relaxed) vs. interview-question confidence
+      parameters:
+        - name: warmup_end_ms
+          in: query
+          required: true
+          schema: { type: integer }
+          description: Frames before this timestamp are treated as warm-up, at/after as interview
+      responses:
+        '200': { description: BaselineComparison }
+        '404': { description: No frames stored for this session yet }
+  /webcam/progress:
+    get:
+      summary: One ProgressPoint per session, for a before/after comparison chart
+      parameters:
+        - name: session_ids
+          in: query
+          required: true
+          schema: { type: array, items: { type: string } }
+          description: Session ids in chronological order
+      responses:
+        '200': { description: ProgressPoint[] }
