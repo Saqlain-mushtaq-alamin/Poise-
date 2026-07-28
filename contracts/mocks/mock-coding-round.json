@@ -1,0 +1,50 @@
+{
+  "round_id": "mock-round-001",
+  "problem": {
+    "id": "mock-problem-001",
+    "title": "Two Sum",
+    "description": "Given a list of integers and a target value, print the two 0-indexed indices whose values add up to the target, space-separated.\n\n**Input format:** first line is the array (space-separated ints), second line is the target.\n**Output format:** two space-separated indices.",
+    "examples": [
+      { "input": "2 7 11 15\n9", "output": "0 1", "explanation": "nums[0] + nums[1] == 9" }
+    ],
+    "constraints": ["2 <= nums.length <= 10^4", "-10^9 <= nums[i] <= 10^9"],
+    "test_cases": [
+      { "input": "2 7 11 15\n9", "expected_output": "0 1", "is_hidden": false },
+      { "input": "3 2 4\n6", "expected_output": "1 2", "is_hidden": false },
+      { "input": "3 3\n6", "expected_output": "0 1", "is_hidden": true }
+    ],
+    "hints": ["A hash map from value to index gets this to O(n)."],
+    "difficulty": "easy",
+    "topics": ["arrays", "hash_map"],
+    "starter_code": {
+      "python": "import sys\n\ndef two_sum(nums, target):\n    # Your code here\n    pass\n\nif __name__ == '__main__':\n    data = sys.stdin.read().split('\\n')\n    nums = list(map(int, data[0].split()))\n    target = int(data[1])\n    print(*two_sum(nums, target))\n"
+    }
+  },
+  "sample_execution_result": {
+    "status": "accepted",
+    "stdout": "0 1",
+    "stderr": "",
+    "execution_time_ms": 12,
+    "memory_used_mb": 14.2,
+    "test_results": [
+      { "input": "2 7 11 15\n9", "expected_output": "0 1", "actual_output": "0 1", "passed": true, "is_hidden": false, "execution_time_ms": 12 },
+      { "input": "3 2 4\n6", "expected_output": "1 2", "actual_output": "1 2", "passed": true, "is_hidden": false, "execution_time_ms": 11 },
+      { "input": "3 3\n6", "expected_output": "0 1", "actual_output": "0 1", "passed": true, "is_hidden": true, "execution_time_ms": 13 }
+    ],
+    "executor": "subprocess",
+    "passed_count": 3,
+    "total_count": 3
+  },
+  "sample_evaluation": {
+    "correctness_score": 100,
+    "style_score": 85,
+    "efficiency_score": 95,
+    "approach_assessment": "optimal",
+    "time_complexity": "O(n)",
+    "space_complexity": "O(n)",
+    "strengths": ["Clean hash map approach", "Handles the single-pass case well"],
+    "improvements": ["Add a docstring explaining the approach"],
+    "alternative_approaches": ["Brute-force O(n^2) nested loop for comparison"],
+    "overall_score": 93
+  }
+}
