@@ -1,0 +1,69 @@
+# Optional Docker tier for Phase 6 — Coding Sandbox.
+#
+# This spins up a self-hosted Judge0 CE instance. It is entirely optional:
+# the sandbox service (backend/app/services/sandbox.py) auto-detects
+# whether this is reachable at POISE_JUDGE0_URL and falls back to the
+# subprocess executor when it isn't. Most users will just use the
+# subprocess fallback; power users / devs who want full container
+# isolation for every submission can run:
+#
+#   docker compose -f docker/judge0-compose.yml up -d
+#
+# then set the env var before starting the FastAPI sidecar:
+#
+#   POISE_JUDGE0_URL=http://localhost:2358
+#
+# Source: https://github.com/judge0/judge0 (Judge0 CE, MIT licensed).
+# Pinned to a specific release for reproducibility — bump deliberately.
+
+version: "3.8"
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  server:
+    image: judge0/judge0:1.13.1
+    ports:
+      - "2358:2358"
+    privileged: true
+    depends_on:
+      - db
+      - redis
+    env_file: judge0.conf
+    logging: *default-logging
+    restart: unless-stopped
+
+  workers:
+    image: judge0/judge0:1.13.1
+    command: ["./scripts/workers"]
+    privileged: true
+    depends_on:
+      - db
+      - redis
+    env_file: judge0.conf
+    logging: *default-logging
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    env_file: judge0.conf
+    volumes:
+      - judge0-postgres-data:/var/lib/postgresql/data
+    logging: *default-logging
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "poise-local-only"]
+    volumes:
+      - judge0-redis-data:/data
+    logging: *default-logging
+    restart: unless-stopped
+
+volumes:
+  judge0-postgres-data:
+  judge0-redis-data:
