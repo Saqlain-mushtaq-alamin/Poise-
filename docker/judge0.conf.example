@@ -1,0 +1,19 @@
+# Copy to docker/judge0.conf before running judge0-compose.yml.
+# Minimal local-only configuration — not intended for internet exposure.
+
+POSTGRES_DB=judge0
+POSTGRES_USER=judge0
+POSTGRES_PASSWORD=change-me-local-only
+
+REDIS_PASSWORD=poise-local-only
+
+# Judge0 app settings
+JUDGE0_HOST=0.0.0.0
+JUDGE0_PORT=2358
+
+# Keep network disabled for submitted code by default (also enforced
+# per-submission by sandbox.py via enable_network=False)
+ENABLE_NETWORK=false
+
+MAX_CPU_TIME_LIMIT=15
+MAX_MEMORY_LIMIT=512000
