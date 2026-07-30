@@ -1,0 +1,263 @@
+/**
+ * Coding sandbox styles — Phase 6.
+ *
+ * Mount point: frontend/src/components/coding/coding.css
+ * Import once from CodingRound.tsx or your global stylesheet:
+ *   import './coding.css';
+ *
+ * Built entirely on the CSS variables defined in Phase 1's
+ * frontend/src/styles/index.css — no new color values introduced.
+ */
+
+.poise-coding-round {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: var(--space-4);
+  height: 100%;
+  min-height: 0;
+}
+
+.poise-coding-round__left {
+  overflow-y: auto;
+  padding: var(--space-6);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.poise-coding-round__right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+}
+
+.poise-coding-round__editor {
+  flex: 1 1 60%;
+  min-height: 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--color-surface);
+}
+
+.poise-coding-round__output {
+  flex: 1 1 40%;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+.poise-coding-round__loading,
+.poise-coding-round__error {
+  color: var(--color-text-secondary);
+  padding: var(--space-8);
+  text-align: center;
+}
+
+.poise-coding-round__toast {
+  position: absolute;
+  bottom: var(--space-6);
+  right: var(--space-6);
+  background: var(--color-accent-danger);
+  color: white;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+/* Code editor */
+
+.poise-code-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-bg-secondary);
+}
+
+.poise-code-editor__toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-surface);
+}
+
+.poise-code-editor__lang-select {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-sans);
+}
+
+.poise-code-editor__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* Buttons (shared with other phases if not already defined globally) */
+
+.poise-btn {
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast), opacity var(--transition-fast);
+}
+
+.poise-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.poise-btn--primary {
+  background: var(--color-accent-primary);
+  color: white;
+}
+
+.poise-btn--secondary {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.poise-btn--ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-surface);
+}
+
+/* Output panel */
+
+.poise-output-panel {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
+.poise-output-panel--empty,
+.poise-output-panel--loading {
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+}
+
+.poise-output-panel__status {
+  font-weight: 700;
+  padding: var(--space-2) 0;
+}
+
+.poise-output-panel__status--success {
+  color: var(--color-accent-success);
+}
+
+.poise-output-panel__status--error {
+  color: var(--color-accent-danger);
+}
+
+.poise-output-panel__tests {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.poise-output-panel__test {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.poise-output-panel__test-detail {
+  margin-left: var(--space-6);
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+}
+
+.poise-output-panel__raw {
+  background: var(--color-bg-primary);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+.poise-output-panel__raw--error {
+  color: var(--color-accent-danger);
+}
+
+.poise-output-panel__meta {
+  color: var(--color-text-muted);
+  margin-top: var(--space-2);
+}
+
+/* Problem panel */
+
+.poise-problem-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.poise-badge {
+  border-radius: var(--radius-full);
+  padding: 2px var(--space-3);
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.poise-badge--easy {
+  background: color-mix(in hsl, var(--color-accent-success) 25%, transparent);
+  color: var(--color-accent-success);
+}
+
+.poise-badge--medium {
+  background: color-mix(in hsl, var(--color-accent-warning) 25%, transparent);
+  color: var(--color-accent-warning);
+}
+
+.poise-badge--hard {
+  background: color-mix(in hsl, var(--color-accent-danger) 25%, transparent);
+  color: var(--color-accent-danger);
+}
+
+.poise-chip {
+  display: inline-block;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-full);
+  padding: 2px var(--space-3);
+  font-size: 12px;
+  margin-right: var(--space-1);
+}
+
+.poise-problem-panel__example pre {
+  background: var(--color-bg-primary);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+}
+
+.poise-problem-panel__footer {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+.poise-problem-panel__hints {
+  color: var(--color-text-secondary);
+}
+
+.poise-screen-capture__error {
+  color: var(--color-accent-danger);
+  font-size: 13px;
+  margin-left: var(--space-2);
+}
