@@ -1,0 +1,271 @@
+/* Phase 10 — styling for motivation components.
+   Uses only the design tokens already defined in
+   frontend/src/styles/index.css (Phase 1) — no new palette introduced. */
+
+.mv-card {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+
+.mv-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  margin: 0 0 var(--space-3) 0;
+}
+
+/* -- Streak heatmap ------------------------------------------------- */
+
+.mv-streak-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.mv-streak-flame {
+  font-size: 22px;
+}
+
+.mv-streak-count {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.mv-streak-label {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.mv-streak-warning {
+  margin-top: var(--space-2);
+  font-size: 13px;
+  color: var(--color-accent-warning);
+}
+
+.mv-heatmap {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 1fr);
+  gap: 3px;
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+}
+
+.mv-heatmap-cell {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--color-surface);
+  transition: transform var(--transition-fast);
+}
+
+.mv-heatmap-cell:hover {
+  transform: scale(1.4);
+}
+
+.mv-heatmap-cell[data-level="1"] { background: hsl(150, 55%, 25%); }
+.mv-heatmap-cell[data-level="2"] { background: hsl(150, 60%, 35%); }
+.mv-heatmap-cell[data-level="3"] { background: hsl(150, 65%, 45%); }
+.mv-heatmap-cell[data-level="4"] { background: var(--color-accent-success); }
+
+/* -- Goal cards ------------------------------------------------------- */
+
+.mv-goal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+
+.mv-progress-track {
+  width: 100%;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  overflow: hidden;
+  margin: var(--space-3) 0;
+}
+
+.mv-progress-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--color-accent-primary), var(--color-accent-secondary));
+}
+
+.mv-goal-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* -- Practice queue ---------------------------------------------------- */
+
+.mv-queue-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  margin-bottom: var(--space-2);
+}
+
+.mv-queue-priority {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.mv-queue-priority[data-priority="high"] { background: hsla(0, 75%, 60%, 0.18); color: var(--color-accent-danger); }
+.mv-queue-priority[data-priority="medium"] { background: hsla(40, 90%, 60%, 0.18); color: var(--color-accent-warning); }
+.mv-queue-priority[data-priority="low"] { background: hsla(190, 85%, 55%, 0.18); color: var(--color-accent-secondary); }
+
+/* -- Achievements ------------------------------------------------------- */
+
+.mv-achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: var(--space-3);
+}
+
+.mv-achievement-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.mv-achievement-badge[data-locked="true"] {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+.mv-achievement-icon {
+  font-size: 26px;
+}
+
+.mv-achievement-name {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+/* -- Coach summary ------------------------------------------------------- */
+
+.mv-coach-narrative {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+}
+
+.mv-coach-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.mv-tag {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+
+/* -- Anxiety toolkit ------------------------------------------------------ */
+
+.mv-exercise-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-3);
+}
+
+.mv-exercise-tile {
+  cursor: pointer;
+  border: 1px solid var(--color-surface);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  text-align: left;
+  color: var(--color-text-primary);
+  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.mv-exercise-tile:hover {
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-2px);
+}
+
+.mv-breathing-circle {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  margin: var(--space-6) auto;
+  background: radial-gradient(circle, var(--color-accent-primary), transparent 70%);
+  border: 2px solid var(--color-accent-primary);
+}
+
+/* -- Self reflection ------------------------------------------------------ */
+
+.mv-reflection-prompt {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-3);
+}
+
+.mv-reflection-textarea {
+  width: 100%;
+  min-height: 80px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-surface);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  padding: var(--space-3);
+  font-family: var(--font-sans);
+  resize: vertical;
+}
+
+.mv-scale-row {
+  display: flex;
+  gap: 6px;
+  margin-top: var(--space-2);
+}
+
+.mv-scale-dot {
+  flex: 1;
+  padding: var(--space-2) 0;
+  text-align: center;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.mv-scale-dot[data-active="true"] {
+  background: var(--color-accent-primary);
+  color: white;
+}
+
+/* -- Empty state ------------------------------------------------------ */
+
+.mv-empty-state {
+  text-align: center;
+  padding: var(--space-8) var(--space-4);
+  color: var(--color-text-secondary);
+}
