@@ -1,0 +1,260 @@
+/* Uses design tokens defined in frontend/src/styles/index.css (Phase 1).
+   No new tokens introduced — only IELTS-specific component classes. */
+
+.ielts-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-4);
+}
+
+/* Part indicator */
+.ielts-part-indicator {
+  display: flex;
+  gap: var(--space-4);
+  justify-content: center;
+}
+.ielts-part-indicator__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+.ielts-part-indicator__badge {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  display: grid;
+  place-items: center;
+  background: var(--color-surface);
+  font-size: 0.75rem;
+}
+.ielts-part-indicator__item--active .ielts-part-indicator__badge {
+  background: var(--color-accent-primary);
+  color: white;
+  box-shadow: var(--shadow-glow);
+}
+.ielts-part-indicator__item--active { color: var(--color-text-primary); font-weight: 600; }
+.ielts-part-indicator__item--done .ielts-part-indicator__badge {
+  background: var(--color-accent-success);
+  color: white;
+}
+
+/* Cue card */
+.ielts-cue-card {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  box-shadow: var(--shadow-md);
+}
+.ielts-cue-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-accent-secondary);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  margin-bottom: var(--space-4);
+}
+.ielts-cue-card__topic {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-4);
+}
+.ielts-cue-card__prompt {
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-2);
+}
+.ielts-cue-card__bullets {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.ielts-cue-card__bullets li {
+  padding-left: var(--space-4);
+  position: relative;
+  color: var(--color-text-primary);
+}
+.ielts-cue-card__bullets li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--color-accent-primary);
+}
+
+/* Timer */
+.ielts-timer {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+}
+.ielts-timer__ring { width: 96px; height: 96px; transform: rotate(-90deg); }
+.ielts-timer__track {
+  fill: none;
+  stroke: var(--color-surface);
+  stroke-width: 6;
+}
+.ielts-timer__progress {
+  fill: none;
+  stroke: var(--color-accent-primary);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+.ielts-timer__progress--warn { stroke: var(--color-accent-warning); }
+.ielts-timer__label-group {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ielts-timer__time { font-size: 1.1rem; font-weight: 700; color: var(--color-text-primary); }
+.ielts-timer__label { font-size: 0.65rem; color: var(--color-text-muted); text-transform: uppercase; }
+
+/* Radar chart */
+.ielts-radar__ring { fill: none; stroke: var(--color-surface); stroke-width: 1; }
+.ielts-radar__axis { stroke: var(--color-surface); stroke-width: 1; }
+.ielts-radar__axis-label { fill: var(--color-text-secondary); font-size: 11px; }
+.ielts-radar__axis-value { fill: var(--color-text-muted); font-size: 10px; }
+.ielts-radar__shape {
+  fill: rgba(139, 92, 246, 0.25);
+  stroke: var(--color-accent-primary);
+  stroke-width: 2;
+}
+.ielts-radar__point { fill: var(--color-accent-primary); }
+
+/* Score reveal */
+.ielts-score-reveal { display: flex; flex-direction: column; align-items: center; gap: var(--space-6); }
+.ielts-score-reveal__hero { display: flex; flex-direction: column; align-items: center; }
+.ielts-score-reveal__hero-label {
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+}
+.ielts-score-reveal__hero-value {
+  font-size: 4.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.ielts-score-reveal__criteria {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.ielts-score-reveal__criterion {
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.ielts-score-reveal__criterion-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-4);
+  background: none;
+  border: none;
+  color: var(--color-text-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+.ielts-score-reveal__criterion-band { color: var(--color-accent-primary); font-size: 1.1rem; }
+.ielts-score-reveal__criterion-body { padding: 0 var(--space-4) var(--space-4); color: var(--color-text-secondary); }
+.ielts-score-reveal__list ul { margin: var(--space-1) 0 var(--space-3); padding-left: var(--space-4); }
+.ielts-score-reveal__list--strengths strong { color: var(--color-accent-success); }
+.ielts-score-reveal__list--improve strong { color: var(--color-accent-warning); }
+.ielts-score-reveal__example {
+  font-style: italic;
+  color: var(--color-text-muted);
+  border-left: 2px solid var(--color-surface);
+  padding-left: var(--space-3);
+}
+
+/* Pronunciation heatmap */
+.ielts-heatmap__words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  line-height: 2;
+}
+.ielts-heatmap__word {
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  cursor: default;
+}
+.ielts-heatmap__word--good { background: rgba(34, 197, 94, 0.18); color: var(--color-accent-success); }
+.ielts-heatmap__word--fair { background: rgba(234, 179, 8, 0.18); color: var(--color-accent-warning); }
+.ielts-heatmap__word--poor { background: rgba(239, 68, 68, 0.18); color: var(--color-accent-danger); }
+.ielts-heatmap__problem-sounds {
+  margin-top: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.ielts-heatmap__problem-sounds-label { color: var(--color-text-muted); font-size: 0.85rem; }
+.ielts-heatmap__phoneme-chip {
+  font-family: var(--font-mono);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+}
+.ielts-heatmap__caveat {
+  margin-top: var(--space-4);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* Prosody timeline */
+.ielts-prosody__stats { display: flex; gap: var(--space-6); margin-bottom: var(--space-4); }
+.ielts-prosody__stat { display: flex; flex-direction: column; }
+.ielts-prosody__stat-value { font-size: 1.4rem; font-weight: 700; color: var(--color-text-primary); }
+.ielts-prosody__stat-label { font-size: 0.75rem; color: var(--color-text-muted); }
+.ielts-prosody__pace-badge {
+  margin-top: var(--space-1);
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  width: fit-content;
+}
+.ielts-prosody__pace-badge--good { background: rgba(34, 197, 94, 0.18); color: var(--color-accent-success); }
+.ielts-prosody__pace-badge--too_fast,
+.ielts-prosody__pace-badge--too_slow { background: rgba(234, 179, 8, 0.18); color: var(--color-accent-warning); }
+.ielts-prosody__timeline {
+  position: relative;
+  height: 28px;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+}
+.ielts-prosody__pause-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(239, 68, 68, 0.4);
+  border-radius: 2px;
+}
+.ielts-prosody__filler-marker {
+  position: absolute;
+  top: -4px;
+  width: 2px;
+  height: 36px;
+  background: var(--color-accent-warning);
+}
+.ielts-prosody__legend { display: flex; gap: var(--space-4); margin-top: var(--space-2); font-size: 0.75rem; color: var(--color-text-muted); }
+.ielts-prosody__legend-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
+.ielts-prosody__legend-swatch--pause { background: rgba(239, 68, 68, 0.4); }
+.ielts-prosody__legend-swatch--filler { background: var(--color-accent-warning); }
