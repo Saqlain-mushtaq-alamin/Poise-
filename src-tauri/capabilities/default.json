@@ -1,14 +1,21 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "identifier": "default",
-  "description": "Capabilities granted to the main Poise window.",
+  "description": "Default capability set for the Poise main window",
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "shell:allow-execute",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-set-focus",
     {
-      "identifier": "shell:allow-spawn",
-      "allow": [{ "name": "poise-backend", "sidecar": true }]
+      "identifier": "shell:allow-open",
+      "allow": [
+        {
+          "name": "open-external-link",
+          "cmd": "open"
+        }
+      ]
     }
   ]
 }
