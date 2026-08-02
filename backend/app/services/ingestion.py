@@ -151,25 +151,36 @@ class ResumeParser:
         """Split out from `parse()` so callers that already have raw text
         (e.g. from a client-side extraction, or tests) don't need a file
         on disk."""
-        raw_response = await self.provider.chat(
-            messages=[
-                {"role": "system", "content": RESUME_PARSE_PROMPT},
-                {"role": "user", "content": text},
-            ],
-            model_role=ModelRole.REASONING,
-            stream=False,
-        )
+        try:
+            raw_response = await self.provider.chat(
+                messages=[
+                    {"role": "system", "content": RESUME_PARSE_PROMPT},
+                    {"role": "user", "content": text},
+                ],
+                model_role=ModelRole.REASONING,
+                stream=False,
+            )
+        except StructuringError:
+            raise
+        except Exception as err:
+            import logging
+            logging.getLogger(__name__).warning("LLM resume parsing unavailable/failed (%s); falling back to heuristic parsing", err)
+            lines = [l.strip() for l in text.splitlines() if l.strip()]
+            name = lines[0] if lines else "Candidate"
+            return ResumeData(
+                full_text=text,
+                name=name[:100],
+                summary=lines[1] if len(lines) > 1 else text[:200],
+            )
+
         try:
             data = ResumeData.model_validate_json(raw_response)
-        except ValidationError as err:
+            data.full_text = text
+            return data
+        except (ValidationError, ValueError) as err:
             raise StructuringError(
                 f"LLM response didn't match the expected resume schema: {err}"
             ) from err
-
-        # full_text always reflects what we actually extracted, regardless
-        # of whether/how the model echoed it back.
-        data.full_text = text
-        return data
 
 
 class JDParser:
@@ -177,17 +188,34 @@ class JDParser:
         self.provider = provider
 
     async def parse(self, jd_text: str) -> JobDescription:
-        raw_response = await self.provider.chat(
-            messages=[
-                {"role": "system", "content": JD_PARSE_PROMPT},
-                {"role": "user", "content": jd_text},
-            ],
-            model_role=ModelRole.REASONING,
-            stream=False,
-        )
+        try:
+            raw_response = await self.provider.chat(
+                messages=[
+                    {"role": "system", "content": JD_PARSE_PROMPT},
+                    {"role": "user", "content": jd_text},
+                ],
+                model_role=ModelRole.REASONING,
+                stream=False,
+            )
+        except StructuringError:
+            raise
+        except Exception as err:
+            import logging
+            logging.getLogger(__name__).warning("LLM JD parsing unavailable/failed (%s); falling back to heuristic parsing", err)
+            lines = [l.strip() for l in jd_text.splitlines() if l.strip()]
+            title = lines[0] if lines else "Job Position"
+            return JobDescription(
+                title=title[:100],
+                company="Target Company",
+                required_skills=[],
+                responsibilities=lines[1:5] if len(lines) > 1 else [],
+                experience_level="mid",
+                domain="General",
+            )
+
         try:
             return JobDescription.model_validate_json(raw_response)
-        except ValidationError as err:
+        except (ValidationError, ValueError) as err:
             raise StructuringError(
                 f"LLM response didn't match the expected job description schema: {err}"
             ) from err
