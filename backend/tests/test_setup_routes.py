@@ -124,6 +124,8 @@ def test_test_connection_step_requires_base_url_for_custom_provider(client):
 
 
 def test_run_smoke_test_fails_gracefully_without_configuration(client):
+    with patch("app.routers.setup.detect_hardware", return_value=_fake_profile(gpus=[], ram_total_gb=8.0)):
+        client.post("/setup/configure-tier", json={"tier": {"tier": "cloud_assist"}})
     resp = client.post("/setup/run-smoke-test")
     assert resp.status_code == 200
     body = resp.json()
