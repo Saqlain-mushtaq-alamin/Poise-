@@ -33,15 +33,22 @@ class Settings(BaseSettings):
     environment: str = "development"
 
     host: str = "127.0.0.1"
-    port: int = 0  # 0 = OS picks a free port; Tauri reads it back from stdout
+    port: int = 8000  # 8000 by default; Tauri sidecar passes POISE_PORT or reads port from stdout
 
     data_dir: Path = _default_data_dir()
     database_filename: str = "poise.db"
 
     cors_origins: list[str] = [
         "tauri://localhost",
+        "https://tauri.localhost",
+        "http://localhost",
         "http://localhost:1420",
+        "http://localhost:1421",
         "http://127.0.0.1:1420",
+        "http://127.0.0.1:1421",
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5173",
     ]
 
     log_level: str = "info"
