@@ -1,10 +1,279 @@
 openapi: 3.0.3
 info:
-  title: Poise Coding API
-  version: 0.0.0
-  description: >
-    Stub contract — owned by the developer assigned to this phase. Define
-    the real paths/schemas here before writing the corresponding router in
-    backend/app/routers/coding.py, so parallel phases can code against this
-    file with mock data (see contracts/mocks/) instead of a running server.
-paths: {}
+  title: Poise Coding Sandbox API
+  version: 0.1.0
+  description: Phase 6 — code execution, evaluation, and screen/whiteboard analysis.
+paths:
+  /coding/problems/generate:
+    post:
+      summary: Generate a coding problem for the session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProblemGenerateRequest' }
+      responses:
+        '200':
+          description: Generated problem
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CodingProblem' }
+
+  /coding/execute:
+    post:
+      summary: Execute code in the sandbox
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CodeSubmission' }
+      responses:
+        '200':
+          description: Execution result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExecutionResult' }
+
+  /coding/evaluate:
+    post:
+      summary: LLM evaluation of submitted code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CodeEvaluateRequest' }
+      responses:
+        '200':
+          description: Code evaluation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CodeEvaluation' }
+
+  /coding/screen/evaluate:
+    post:
+      summary: Evaluate a screen/whiteboard screenshot
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image: { type: string, format: binary }
+                context: { type: string }
+                session_id: { type: string }
+              required: [image]
+      responses:
+        '200':
+          description: Screen evaluation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScreenEvaluation' }
+
+  /interview/sessions/{session_id}/coding-round:
+    post:
+      summary: Start a coding round (Phase 4 handoff entry point)
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CodingRoundStartRequest' }
+      responses:
+        '200':
+          description: Coding round started
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CodingRoundStartResponse' }
+
+  /interview/sessions/{session_id}/coding-round/{round_id}/complete:
+    post:
+      summary: Finalize a coding round and get the fused evaluation
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: round_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Coding round result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CodingRoundCompleteResponse' }
+
+components:
+  schemas:
+    Example:
+      type: object
+      properties:
+        input: { type: string }
+        output: { type: string }
+        explanation: { type: string, nullable: true }
+      required: [input, output]
+
+    TestCase:
+      type: object
+      properties:
+        input: { type: string }
+        expected_output: { type: string }
+        is_hidden: { type: boolean, default: false }
+      required: [input, expected_output]
+
+    CodingProblem:
+      type: object
+      properties:
+        id: { type: string, nullable: true }
+        title: { type: string }
+        description: { type: string }
+        examples:
+          type: array
+          items: { $ref: '#/components/schemas/Example' }
+        constraints:
+          type: array
+          items: { type: string }
+        test_cases:
+          type: array
+          items: { $ref: '#/components/schemas/TestCase' }
+        hints:
+          type: array
+          items: { type: string }
+        difficulty: { type: string, enum: [easy, medium, hard] }
+        topics:
+          type: array
+          items: { type: string }
+        starter_code:
+          type: object
+          additionalProperties: { type: string }
+      required: [title, description, difficulty]
+
+    ProblemGenerateRequest:
+      type: object
+      properties:
+        session_id: { type: string, nullable: true }
+        jd_id: { type: string, nullable: true }
+        resume_id: { type: string, nullable: true }
+        difficulty: { type: string, default: medium }
+        topics:
+          type: array
+          items: { type: string }
+        language_hint: { $ref: '#/components/schemas/Language' }
+
+    Language:
+      type: string
+      enum: [python, javascript, typescript, java, cpp, go, rust]
+
+    CodeSubmission:
+      type: object
+      properties:
+        code: { type: string }
+        language: { $ref: '#/components/schemas/Language' }
+        problem_id: { type: string, nullable: true }
+        test_cases:
+          type: array
+          items: { $ref: '#/components/schemas/TestCase' }
+        time_limit_seconds: { type: integer, default: 10 }
+        memory_limit_mb: { type: integer, default: 256 }
+        stdin: { type: string, nullable: true }
+      required: [code, language]
+
+    TestCaseResult:
+      type: object
+      properties:
+        input: { type: string }
+        expected_output: { type: string }
+        actual_output: { type: string }
+        passed: { type: boolean }
+        is_hidden: { type: boolean }
+        execution_time_ms: { type: integer, nullable: true }
+        error: { type: string, nullable: true }
+
+    ExecutionResult:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [accepted, wrong_answer, runtime_error, time_limit, memory_limit, compile_error, internal_error]
+        stdout: { type: string }
+        stderr: { type: string }
+        execution_time_ms: { type: integer }
+        memory_used_mb: { type: number }
+        test_results:
+          type: array
+          items: { $ref: '#/components/schemas/TestCaseResult' }
+        executor: { type: string, enum: [judge0, subprocess] }
+        passed_count: { type: integer }
+        total_count: { type: integer }
+
+    CodeEvaluateRequest:
+      type: object
+      properties:
+        code: { type: string }
+        language: { $ref: '#/components/schemas/Language' }
+        problem_id: { type: string }
+        execution_result:
+          $ref: '#/components/schemas/ExecutionResult'
+      required: [code, language, problem_id]
+
+    CodeEvaluation:
+      type: object
+      properties:
+        correctness_score: { type: number }
+        style_score: { type: number }
+        efficiency_score: { type: number }
+        approach_assessment: { type: string, enum: [brute_force, near_optimal, optimal] }
+        time_complexity: { type: string }
+        space_complexity: { type: string }
+        strengths:
+          type: array
+          items: { type: string }
+        improvements:
+          type: array
+          items: { type: string }
+        alternative_approaches:
+          type: array
+          items: { type: string }
+        overall_score: { type: number }
+
+    ScreenEvaluation:
+      type: object
+      properties:
+        description: { type: string }
+        diagram_quality: { type: number }
+        completeness: { type: number }
+        feedback:
+          type: array
+          items: { type: string }
+
+    CodingRoundStartRequest:
+      type: object
+      properties:
+        difficulty: { type: string, default: medium }
+        topics:
+          type: array
+          items: { type: string }
+        language_hint: { $ref: '#/components/schemas/Language' }
+
+    CodingRoundStartResponse:
+      type: object
+      properties:
+        round_id: { type: string }
+        problem: { $ref: '#/components/schemas/CodingProblem' }
+
+    CodingRoundCompleteResponse:
+      type: object
+      properties:
+        round_id: { type: string }
+        session_id: { type: string }
+        final_evaluation: { $ref: '#/components/schemas/CodeEvaluation' }
+        execution_summary: { $ref: '#/components/schemas/ExecutionResult' }
+        screen_evaluations:
+          type: array
+          items: { $ref: '#/components/schemas/ScreenEvaluation' }
