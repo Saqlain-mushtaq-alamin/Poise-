@@ -117,9 +117,6 @@ class TTSEngine:
         if not self._backend_available():
             return [_PLACEHOLDER_VOICE]
 
-        # Real backends would enumerate their installed voices here. None
-        # are installed in this environment, so this branch is written but
-        # not exercised by any test — see the module docstring.
         if self.backend_name == "piper":
             return self._list_piper_voices()
         if self.backend_name == "xtts-v2":
@@ -132,28 +129,82 @@ class TTSEngine:
     def _list_xtts_voices(self) -> list[VoiceInfo]:  # pragma: no cover — needs coqui-tts + model
         raise TTSBackendUnavailable("XTTS voice enumeration not implemented for this build")
 
-    def _list_edge_voices(self) -> list[VoiceInfo]:  # pragma: no cover — needs network access
-        raise TTSBackendUnavailable("Edge TTS voice enumeration not implemented for this build")
+    def _list_edge_voices(self) -> list[VoiceInfo]:
+        try:
+            import asyncio
+            import concurrent.futures
+            import edge_tts
+
+            async def _fetch() -> list[VoiceInfo]:
+                raw = await edge_tts.list_voices()
+                res: list[VoiceInfo] = []
+                for v in raw:
+                    locale = v.get("Locale", "")
+                    short_name = v.get("ShortName", "")
+                    friendly = v.get("FriendlyName", short_name)
+                    gender = v.get("Gender", "female").lower()
+                    if locale.startswith("en-"):
+                        res.append(
+                            VoiceInfo(
+                                id=short_name,
+                                name=friendly,
+                                language=locale,
+                                gender=gender,
+                            )
+                        )
+                return res or [_PLACEHOLDER_VOICE]
+
+            try:
+                loop = asyncio.get_running_loop()
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    return pool.submit(lambda: asyncio.run(_fetch())).result(timeout=4)
+            except RuntimeError:
+                return asyncio.run(_fetch())
+        except Exception as e:
+            logger.warning("Failed to fetch Edge TTS voices: %s", e)
+            return [_PLACEHOLDER_VOICE]
 
     async def synthesize_stream(
         self, text: str, voice: str = "default", chunk_samples: int = 4410
     ) -> AsyncGenerator[bytes, None]:
-        """Yields WAV byte chunks. Falls back to the placeholder tone
-        whenever the tier-appropriate backend isn't actually available —
-        see the module docstring for why that's a deliberate design choice,
-        not a bug."""
-        if self._backend_available():
+        """Yields audio byte chunks. Uses Edge TTS if available and requested,
+        falling back to placeholder tone whenever real synthesis isn't available
+        or when default/placeholder voice is selected."""
+        is_edge_voice = voice and voice.startswith("en-")
+
+        if is_edge_voice and self._probe_edge_tts():
+            try:
+                async for chunk in self._synthesize_edge_tts(text, voice):
+                    yield chunk
+                return
+            except Exception:  # noqa: BLE001
+                logger.exception("Edge TTS synthesis failed; falling back to placeholder tone")
+
+        if self._backend_available() and is_edge_voice:
             try:
                 async for chunk in self._synthesize_with_real_backend(text, voice, chunk_samples):
                     yield chunk
                 return
-            except Exception:  # noqa: BLE001 — any backend failure falls back, never crashes
+            except Exception:  # noqa: BLE001
                 logger.exception(
                     "TTS backend %s failed; falling back to placeholder tone", self.backend_name
                 )
 
-        async for chunk in self._synthesize_placeholder(text, chunk_samples):
+        async for chunk in self._synthesize_placeholder(text or " ", chunk_samples):
             yield chunk
+
+    async def _synthesize_edge_tts(self, text: str, voice: str) -> AsyncGenerator[bytes, None]:
+        import edge_tts
+
+        edge_voice = (
+            voice
+            if voice and voice != "default" and voice != PLACEHOLDER_VOICE_ID
+            else "en-US-AvaNeural"
+        )
+        communicate = edge_tts.Communicate(text, edge_voice)
+        async for chunk in communicate.stream():
+            if chunk.get("type") == "audio":
+                yield chunk["data"]
 
     async def _synthesize_with_real_backend(
         self, text: str, voice: str, chunk_samples: int
