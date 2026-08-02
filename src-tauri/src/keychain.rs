@@ -153,6 +153,7 @@ async fn push_key_to_sidecar(
     Ok(())
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ConfiguredProvider {
     pub provider: String,
