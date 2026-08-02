@@ -11,8 +11,12 @@ Rust sidecar manager reads that line to learn which port to talk to.
 
 from __future__ import annotations
 
+import os
 import socket
 import sys
+
+os.environ["LITELLM_LOCAL_RESOURCES"] = "True"
+os.environ["DISABLE_LITELLM_TELEMETRY"] = "True"
 
 import uvicorn
 from fastapi import FastAPI
@@ -41,7 +45,19 @@ def create_app() -> FastAPI:
 
     Base.metadata.create_all(bind=engine)
 
-    from app.routers import hardware, health, provider, setup
+    from app.routers import (
+        coding,
+        hardware,
+        health,
+        ielts,
+        interview,
+        motivation,
+        provider,
+        scoring,
+        setup,
+        voice,
+        webcam,
+    )
     from app.routers import settings as settings_router
 
     app.include_router(health.router)
@@ -49,11 +65,29 @@ def create_app() -> FastAPI:
     app.include_router(hardware.router)
     app.include_router(provider.router)
     app.include_router(setup.router)
+    app.include_router(interview.router)
+    app.include_router(ielts.router)
+    app.include_router(coding.router)
+    app.include_router(motivation.router)
+    app.include_router(scoring.router)
+    app.include_router(voice.router)
+    app.include_router(webcam.router)
 
     return app
 
 
 app = create_app()
+
+
+def _is_port_available(port: int) -> bool:
+    if port <= 0:
+        return False
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(("127.0.0.1", port))
+            return True
+        except OSError:
+            return False
 
 
 def _find_free_port() -> int:
@@ -64,15 +98,15 @@ def _find_free_port() -> int:
 
 def run() -> None:
     settings = get_settings()
-    port = settings.port or _find_free_port()
+    target_port = settings.port if _is_port_available(settings.port) else _find_free_port()
 
     # First stdout line: contract with src-tauri/src/sidecar.rs
-    print(f"POISE_SIDECAR_PORT={port}", flush=True)
+    print(f"POISE_SIDECAR_PORT={target_port}", flush=True)
 
     uvicorn.run(
         app,
         host=settings.host,
-        port=port,
+        port=target_port,
         log_level=settings.log_level,
         reload=False,
     )
