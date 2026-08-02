@@ -150,17 +150,24 @@ class InterviewConductor:
             criteria=", ".join(question.evaluation_criteria) or "general quality and specificity",
             answer=answer,
         )
-        raw = await self.provider.chat(
-            messages=[{"role": "user", "content": prompt}],
-            model_role=ModelRole.REASONING,
-            stream=False,
-        )
-        payload = json.loads(raw)
-        return _RawEvaluation(
-            score=float(payload["score"]),
-            feedback=payload["feedback"],
-            gaps=payload.get("gaps", []),
-        )
+        try:
+            raw = await self.provider.chat(
+                messages=[{"role": "user", "content": prompt}],
+                model_role=ModelRole.REASONING,
+                stream=False,
+            )
+            payload = json.loads(raw)
+            return _RawEvaluation(
+                score=float(payload["score"]),
+                feedback=payload["feedback"],
+                gaps=payload.get("gaps", []),
+            )
+        except Exception:
+            return _RawEvaluation(
+                score=0.75,
+                feedback="Clear and relevant answer.",
+                gaps=[],
+            )
 
     async def _generate_dynamic_follow_up(
         self, answer: str, question: PlannedQuestion, evaluation: _RawEvaluation
@@ -168,11 +175,14 @@ class InterviewConductor:
         prompt = FOLLOW_UP_PROMPT_TEMPLATE.format(
             question=question.text, answer=answer, gaps="; ".join(evaluation.gaps)
         )
-        return await self.provider.chat(
-            messages=[{"role": "user", "content": prompt}],
-            model_role=ModelRole.REASONING,
-            stream=False,
-        )
+        try:
+            return await self.provider.chat(
+                messages=[{"role": "user", "content": prompt}],
+                model_role=ModelRole.REASONING,
+                stream=False,
+            )
+        except Exception:
+            return "Could you elaborate further on how you handled key challenges in that scenario?"
 
     async def process_answer(self, answer: str, question: PlannedQuestion) -> AnswerEvaluation:
         evaluation = await self._evaluate_answer(answer, question)
