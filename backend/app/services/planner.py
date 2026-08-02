@@ -204,11 +204,18 @@ class InterviewPlanner:
             jd_summary=_jd_summary(jd),
         )
 
-        raw_response = await self.provider.chat(
-            messages=[{"role": "user", "content": prompt}],
-            model_role=ModelRole.REASONING,
-            stream=False,
-        )
+        try:
+            raw_response = await self.provider.chat(
+                messages=[{"role": "user", "content": prompt}],
+                model_role=ModelRole.REASONING,
+                stream=False,
+            )
+        except PlanGenerationError:
+            raise
+        except Exception as err:
+            import logging
+            logging.getLogger(__name__).warning("LLM plan generation failed (%s); generating fallback plan", err)
+            return self._generate_fallback_plan(resume, jd, config, section_budgets)
 
         try:
             payload = json.loads(raw_response)
@@ -228,3 +235,80 @@ class InterviewPlanner:
             raise PlanGenerationError(
                 f"LLM response didn't match the expected interview plan schema: {err}"
             ) from err
+
+    def _generate_fallback_plan(
+        self, resume: ResumeData, jd: JobDescription, config: InterviewConfig, section_budgets: dict[str, int]
+    ) -> InterviewPlan:
+        sections = []
+        q_idx = 1
+
+        for sec_type, budget in section_budgets.items():
+            questions = []
+            if sec_type == "behavioral":
+                questions.append(
+                    PlannedQuestion(
+                        id=f"q{q_idx}",
+                        text=f"Tell me about a challenging project you worked on, relevant to {jd.title}.",
+                        follow_ups=["What was your individual contribution?", "How did you measure success?"],
+                        evaluation_criteria=["Clarity", "STAR method", "Ownership"],
+                        difficulty=config.difficulty,
+                        skills_tested=["Communication", "Problem Solving"],
+                        source="behavioral_framework",
+                    )
+                )
+                q_idx += 1
+            elif sec_type == "technical":
+                req_skills = ", ".join(jd.required_skills[:3]) if jd.required_skills else "software engineering"
+                questions.append(
+                    PlannedQuestion(
+                        id=f"q{q_idx}",
+                        text=f"Can you explain core technical principles when working with {req_skills}?",
+                        follow_ups=["What trade-offs do you consider?", "How do you handle edge cases?"],
+                        evaluation_criteria=["Technical depth", "Trade-off analysis"],
+                        difficulty=config.difficulty,
+                        skills_tested=jd.required_skills[:3] or ["System Fundamentals"],
+                        source="jd_requirement",
+                    )
+                )
+                q_idx += 1
+            elif sec_type == "coding":
+                questions.append(
+                    PlannedQuestion(
+                        id=f"q{q_idx}",
+                        text="Write an efficient algorithm to solve data processing tasks under memory constraints.",
+                        follow_ups=["What is the time complexity?", "Can you optimize space complexity?"],
+                        evaluation_criteria=["Code correctness", "Time & Space Complexity"],
+                        difficulty=config.difficulty,
+                        skills_tested=["Data Structures", "Algorithms"],
+                        source="jd_requirement",
+                    )
+                )
+                q_idx += 1
+            elif sec_type == "system_design":
+                questions.append(
+                    PlannedQuestion(
+                        id=f"q{q_idx}",
+                        text=f"Design a scalable system for {jd.title} handling high concurrent traffic.",
+                        follow_ups=["How do you handle data consistency?", "Where are single points of failure?"],
+                        evaluation_criteria=["Scalability", "Reliability", "Component Design"],
+                        difficulty=config.difficulty,
+                        skills_tested=["Distributed Systems", "Architecture"],
+                        source="jd_requirement",
+                    )
+                )
+                q_idx += 1
+
+            sections.append(
+                InterviewSection(
+                    type=sec_type,
+                    title=f"{sec_type.replace('_', ' ').title()} Round",
+                    questions=questions,
+                    time_budget_minutes=budget,
+                )
+            )
+
+        return InterviewPlan(
+            sections=sections,
+            estimated_duration_minutes=config.duration_minutes,
+            coverage_matrix={"General": [f"q{i}" for i in range(1, q_idx)]},
+        )
