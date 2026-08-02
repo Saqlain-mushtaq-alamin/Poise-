@@ -66,6 +66,7 @@ class ModelProviderRouter:
         self._model_plan = model_plan_for(tier)
         self._api_keys: dict[str, str] = {}
         self._custom_base_url: str | None = None
+        self._model_override: str | None = None
         self.token_tracker = token_tracker or TokenTracker()
 
     # ---- configuration ----
@@ -73,6 +74,18 @@ class ModelProviderRouter:
     def set_tier(self, tier: HardwareTier) -> None:
         self._tier = tier
         self._model_plan = model_plan_for(tier)
+        if self._model_override:
+            self._model_plan.llm = self._model_override
+
+    def set_model_override(self, model: str | None) -> None:
+        self._model_override = model
+        if model:
+            self._model_plan.llm = model
+        else:
+            self._model_plan = model_plan_for(self._tier)
+
+    def get_model_override(self) -> str | None:
+        return self._model_override
 
     @property
     def tier(self) -> HardwareTier:
@@ -129,6 +142,9 @@ class ModelProviderRouter:
             # Always local regardless of tier — never sent to a cloud API.
             return "wav2vec2"
 
+        if model_role == ModelRole.REASONING and self._model_override:
+            return self._model_override
+
         plan = self._model_plan
         model = {
             ModelRole.REASONING: plan.llm,
@@ -140,6 +156,50 @@ class ModelProviderRouter:
             raise ProviderError(
                 f"No model configured for role={model_role.value} at tier={self._tier.value}"
             )
+
+        if model_role in (ModelRole.REASONING, ModelRole.EMBEDDING) and self._tier in (
+            HardwareTier.LOCAL_FULL, HardwareTier.LOCAL_LITE
+        ):
+            from app.services.hardware import detect_hardware
+            profile = detect_hardware()
+            if profile.ollama_available and profile.ollama_models:
+                # Known embedding-only models that cannot be used for chat
+                _EMBED_ONLY = {"nomic-embed-text", "mxbai-embed-large", "all-minilm"}
+
+                if model_role == ModelRole.EMBEDDING:
+                    # For embedding: prefer exact match, then any embed model
+                    embed_models = [
+                        m for m in profile.ollama_models
+                        if any(e in m.lower() for e in ("embed", "nomic"))
+                    ]
+                    for m in profile.ollama_models:
+                        if m == model or m.startswith(model.split(":")[0]):
+                            return m
+                    if embed_models:
+                        return embed_models[0]
+                    return model  # Fall through to LiteLLM
+
+                # For REASONING: pick the best chat-capable Ollama model
+                llm_candidates = [
+                    m for m in profile.ollama_models
+                    if not any(e in m.lower() for e in _EMBED_ONLY)
+                ]
+                if not llm_candidates:
+                    return model  # No chat models available
+
+                # 1. Exact match
+                if model in llm_candidates:
+                    return model
+
+                # 2. Same base family (e.g. qwen, llama, gemma)
+                base_prefix = model.split(":")[0].split("-")[0].lower()
+                for candidate in llm_candidates:
+                    if base_prefix in candidate.lower():
+                        return candidate
+
+                # 3. Any capable model
+                return llm_candidates[0]
+
         return model
 
     def _is_cloud_model(self, model: str) -> bool:
@@ -216,8 +276,31 @@ class ModelProviderRouter:
 
 # Process-wide singleton. FastAPI dependency `get_router()` returns this so
 # every request shares the same in-memory key store and token tally.
-_router_instance = ModelProviderRouter()
+# Auto-initialise to the detected hardware tier so first-time users with
+# Ollama running don't need to manually configure anything.
+def _build_default_router() -> "ModelProviderRouter":
+    try:
+        from app.services.hardware import detect_hardware
+        from app.services.tier import recommend_tier
+        profile = detect_hardware()
+        rec = recommend_tier(profile)
+        router = ModelProviderRouter(tier=rec.recommended_tier)
+        logger.info(
+            "Provider router initialised: tier=%s model=%s",
+            rec.recommended_tier.value,
+            rec.model_plan.llm,
+        )
+        return router
+    except Exception:  # noqa: BLE001
+        logger.warning("Hardware detection failed during startup; defaulting to cloud_assist")
+        return ModelProviderRouter()
 
 
-def get_router() -> ModelProviderRouter:
+_router_instance: "ModelProviderRouter | None" = None
+
+
+def get_router() -> "ModelProviderRouter":
+    global _router_instance
+    if _router_instance is None:
+        _router_instance = _build_default_router()
     return _router_instance
