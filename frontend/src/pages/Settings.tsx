@@ -43,8 +43,9 @@ export function Settings({ api, sidecarPort }: SettingsProps) {
   const voicePipeline = useVoicePipeline({ api, sidecarPort });
 
   useEffect(() => {
+    if (!api) return;
     api
-      ?.listVoices()
+      ?.listVoices<VoiceInfo[]>()
       .then(setVoices)
       .catch(() => setVoices([]));
   }, [api]);
@@ -68,6 +69,12 @@ export function Settings({ api, sidecarPort }: SettingsProps) {
     <div className="page">
       <h1>Settings</h1>
 
+      {!api && (
+        <p className="settings-card__warning" style={{ marginBottom: "1.5rem" }}>
+          ⚠️ Sidecar not connected — hardware and model settings will appear once the backend initialises.
+        </p>
+      )}
+
       <section className="settings__section">
         <h2>Appearance</h2>
         <label className="settings__row">
@@ -86,7 +93,14 @@ export function Settings({ api, sidecarPort }: SettingsProps) {
       <section className="settings__section">
         <h2>Hardware &amp; model providers</h2>
 
-        {error && <p className="settings-card__warning">{error}</p>}
+        {error && (
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "0.75rem" }}>
+            <p className="settings-card__warning" style={{ margin: 0 }}>{error}</p>
+            <button type="button" onClick={refresh} disabled={loading} style={{ flexShrink: 0, padding: "0.25rem 0.75rem" }}>
+              {loading ? "Retrying…" : "Retry"}
+            </button>
+          </div>
+        )}
 
         <HardwareTierCard
           profile={profile}
@@ -103,7 +117,12 @@ export function Settings({ api, sidecarPort }: SettingsProps) {
           onTest={testConnection}
         />
 
-        <ModelConfigCard modelPlan={providerStatus?.model_plan ?? null} />
+        <ModelConfigCard
+          modelPlan={providerStatus?.model_plan ?? null}
+          api={api}
+          ollamaModels={profile?.ollama_models ?? []}
+          onModelChange={refresh}
+        />
 
         <CostLimitSlider costEstimate={costEstimate} onChange={setCostCap} />
 
@@ -113,8 +132,8 @@ export function Settings({ api, sidecarPort }: SettingsProps) {
             Sends one trivial request through the active tier + provider to confirm everything
             actually works end to end.
           </p>
-          <button type="button" onClick={handleSmokeTest} disabled={smokeTestBusy}>
-            {smokeTestBusy ? "Running\u2026" : "Run smoke test"}
+          <button type="button" onClick={handleSmokeTest} disabled={smokeTestBusy || !api}>
+            {smokeTestBusy ? "Running…" : "Run smoke test"}
           </button>
           {smokeTestResult && <p className="settings-card__reason">{smokeTestResult}</p>}
         </div>
@@ -122,16 +141,22 @@ export function Settings({ api, sidecarPort }: SettingsProps) {
 
       <section className="settings__section">
         <h2>Voice</h2>
-        {voicePipeline.error && <p className="settings-card__warning">{voicePipeline.error}</p>}
-        <AudioSettings
-          voices={voices}
-          volumeLevel={voicePipeline.volumeLevel}
-          turnState={voicePipeline.turnState}
-          partialTranscript={voicePipeline.partialTranscript}
-          onPreviewVoice={() => voicePipeline.speak("This is a preview of this voice.")}
-          onTestTranscribe={voicePipeline.startListening}
-          onStopTest={voicePipeline.stopListening}
-        />
+        {!api ? (
+          <p className="page__placeholder-note">Connect the sidecar to configure voice settings.</p>
+        ) : (
+          <>
+            {voicePipeline.error && <p className="settings-card__warning">{voicePipeline.error}</p>}
+            <AudioSettings
+              voices={voices}
+              volumeLevel={voicePipeline.volumeLevel}
+              turnState={voicePipeline.turnState}
+              partialTranscript={voicePipeline.partialTranscript}
+              onPreviewVoice={() => voicePipeline.speak("This is a preview of this voice.")}
+              onTestTranscribe={voicePipeline.startListening}
+              onStopTest={voicePipeline.stopListening}
+            />
+          </>
+        )}
       </section>
     </div>
   );
