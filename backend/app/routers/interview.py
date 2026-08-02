@@ -212,6 +212,36 @@ async def parse_jd(
     return {"jd_id": record.id, "job_description": json.loads(data.model_dump_json())}
 
 
+class ParseResumeTextRequest(BaseModel):
+    text: str
+
+
+@router.post("/parse-resume-text")
+async def parse_resume_text(
+    body: ParseResumeTextRequest,
+    db: DBSession = Depends(get_db),
+    provider: ModelProviderRouter = Depends(get_router),
+):
+    """Parse a resume from raw text (no file upload). Mirrors /parse-resume
+    but accepts a JSON body with {"text": "..."} for cases where the client
+    has already extracted the text, or is passing clipboard content."""
+    parser = ResumeParser(provider)
+    try:
+        data = await parser.parse_text(body.text)
+    except StructuringError as err:
+        raise HTTPException(status_code=502, detail=str(err)) from err
+
+    record = Resume(
+        filename="text-input",
+        full_text=body.text,
+        structured_json=data.model_dump_json(),
+    )
+    db.add(record)
+    db.commit()
+
+    return {"resume_id": record.id, "resume": json.loads(data.model_dump_json())}
+
+
 def _load_resume(db: DBSession, resume_id: str) -> ResumeData:
     row = db.get(Resume, resume_id)
     if row is None:
