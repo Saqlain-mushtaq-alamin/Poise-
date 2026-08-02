@@ -50,18 +50,27 @@ export function useHardwareSettings(api: PoiseAPI | null): UseHardwareSettingsRe
     setLoading(true);
     setError(null);
     try {
-      const [profileRes, tierRes, statusRes, costRes, configuredRes] = await Promise.all([
-        api.getHardwareProfile(),
-        api.getTier(),
-        api.getProviderStatus(),
-        api.getCostEstimate(),
-        isTauri ? listConfiguredProviders() : Promise.resolve<string[]>([]),
+      const [profileRes, tierRes, statusRes, costRes, configuredRes] = await Promise.allSettled([
+        api.getHardwareProfile<HardwareProfile>(),
+        api.getTier<TierRecommendation>(),
+        api.getProviderStatus<ProviderStatus>(),
+        api.getCostEstimate<CostEstimate>(),
+        isTauri ? listConfiguredProviders().catch(() => []) : Promise.resolve<string[]>([]),
       ]);
-      setProfile(profileRes);
-      setTierState(tierRes);
-      setProviderStatus(statusRes);
-      setCostEstimate(costRes);
-      setConfiguredProviders(configuredRes);
+
+      if (profileRes.status === "fulfilled") setProfile(profileRes.value);
+      if (tierRes.status === "fulfilled") setTierState(tierRes.value);
+      if (statusRes.status === "fulfilled") setProviderStatus(statusRes.value);
+      if (costRes.status === "fulfilled") setCostEstimate(costRes.value);
+      if (configuredRes.status === "fulfilled") setConfiguredProviders(configuredRes.value);
+
+      const failures = [profileRes, tierRes, statusRes]
+        .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+        .map((r) => r.reason?.message || String(r.reason));
+
+      if (failures.length > 0) {
+        setError(failures[0]);
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -76,7 +85,7 @@ export function useHardwareSettings(api: PoiseAPI | null): UseHardwareSettingsRe
   const overrideTier = useCallback(
     async (nextTier: HardwareTier) => {
       if (!api) return;
-      const rec = await api.setTier(nextTier);
+      const rec = await api.setTier<TierRecommendation>(nextTier);
       setTierState(rec);
       await refresh();
     },
@@ -102,20 +111,20 @@ export function useHardwareSettings(api: PoiseAPI | null): UseHardwareSettingsRe
   const testConnection = useCallback(
     async (provider: string, key?: string, baseUrl?: string) => {
       if (!api) throw new Error("Sidecar not connected yet");
-      return api.testConnection(provider, key, baseUrl);
+      return api.testConnection<TestConnectionResult>(provider, key, baseUrl);
     },
     [api]
   );
 
   const runSmokeTest = useCallback(async () => {
     if (!api) throw new Error("Sidecar not connected yet");
-    return api.runSmokeTest();
+    return api.runSmokeTest<SmokeTestResult>();
   }, [api]);
 
   const setCostCap = useCallback(
     async (softCapTokens: number, softCapUsd: number) => {
       if (!api) return;
-      const estimate = await api.setCostCap(softCapTokens, softCapUsd);
+      const estimate = await api.setCostCap<CostEstimate>(softCapTokens, softCapUsd);
       setCostEstimate(estimate);
     },
     [api]
