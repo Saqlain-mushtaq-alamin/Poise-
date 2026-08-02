@@ -12,10 +12,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from app.database import get_db
+from app.models.settings import AppSettings
 from app.routers.hardware import ModelPlanResponse
 from app.services.hardware import detect_hardware
 from app.services.provider import ModelProviderRouter, ProviderError, get_router
 from app.services.tier import HardwareTier
+from sqlalchemy.orm import Session as DBSession
 
 router = APIRouter(prefix="/provider", tags=["provider"])
 
@@ -50,6 +53,15 @@ class SetApiKeyResponse(BaseModel):
 class CostCapRequest(BaseModel):
     soft_cap_tokens: int
     soft_cap_usd: float
+
+
+class SetModelRequest(BaseModel):
+    model: str | None
+
+
+class ModelConfigResponse(BaseModel):
+    selected_model: str
+    available_models: list[str]
 
 
 @router.get("/status", response_model=ProviderStatusResponse)
@@ -105,3 +117,45 @@ def clear_api_key(
 ) -> SetApiKeyResponse:
     provider_router.clear_api_key(provider)
     return SetApiKeyResponse(provider=provider, status="cleared")
+
+
+@router.get("/model", response_model=ModelConfigResponse)
+def get_model_config(
+    db: DBSession = Depends(get_db),
+    provider_router: ModelProviderRouter = Depends(get_router),
+) -> ModelConfigResponse:
+    profile = detect_hardware()
+    saved = db.get(AppSettings, "selected_llm_model")
+    override = saved.value if saved else provider_router.get_model_override()
+    if override:
+        provider_router.set_model_override(override)
+
+    selected = provider_router.model_plan.llm
+    available = profile.ollama_models if profile.ollama_available else []
+    return ModelConfigResponse(selected_model=selected, available_models=available)
+
+
+@router.put("/model", response_model=ModelConfigResponse)
+def set_model_config(
+    body: SetModelRequest,
+    db: DBSession = Depends(get_db),
+    provider_router: ModelProviderRouter = Depends(get_router),
+) -> ModelConfigResponse:
+    profile = detect_hardware()
+    row = db.get(AppSettings, "selected_llm_model")
+    if body.model:
+        if row is None:
+            row = AppSettings(key="selected_llm_model", value=body.model)
+            db.add(row)
+        else:
+            row.value = body.model
+        provider_router.set_model_override(body.model)
+    else:
+        if row:
+            db.delete(row)
+        provider_router.set_model_override(None)
+    db.commit()
+
+    selected = provider_router.model_plan.llm
+    available = profile.ollama_models if profile.ollama_available else []
+    return ModelConfigResponse(selected_model=selected, available_models=available)
