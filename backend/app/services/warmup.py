@@ -87,11 +87,14 @@ class WarmUpConductor:
             company_clause=company_clause,
             resume_summary=resume.summary or "(no summary available)",
         )
-        return await self.provider.chat(
-            messages=[{"role": "user", "content": prompt}],
-            model_role=ModelRole.REASONING,
-            stream=False,
-        )
+        try:
+            return await self.provider.chat(
+                messages=[{"role": "user", "content": prompt}],
+                model_role=ModelRole.REASONING,
+                stream=False,
+            )
+        except Exception:
+            return f"Hello {resume.name or 'there'}! Welcome to your interview for the {jd.title} position. It's great to connect with you today."
 
     async def respond_to_small_talk(
         self, user_response: str, current_stage: str, persona: Persona
@@ -104,11 +107,14 @@ class WarmUpConductor:
             user_response=user_response,
             stage_guidance=stage_guidance,
         )
-        text = await self.provider.chat(
-            messages=[{"role": "user", "content": prompt}],
-            model_role=ModelRole.REASONING,
-            stream=False,
-        )
+        try:
+            text = await self.provider.chat(
+                messages=[{"role": "user", "content": prompt}],
+                model_role=ModelRole.REASONING,
+                stream=False,
+            )
+        except Exception:
+            text = "Thank you for sharing that! Let's get started with our interview."
 
         upcoming = next_stage(current_stage)
         return WarmUpResponse(text=text, next_stage=upcoming, is_complete=upcoming is None)
