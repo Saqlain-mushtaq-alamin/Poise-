@@ -1,10 +1,396 @@
 openapi: 3.0.3
 info:
   title: Poise Motivation API
-  version: 0.0.0
-  description: >
-    Stub contract — owned by the developer assigned to this phase. Define
-    the real paths/schemas here before writing the corresponding router in
-    backend/app/routers/motivation.py, so parallel phases can code against this
-    file with mock data (see contracts/mocks/) instead of a running server.
-paths: {}
+  version: "1.0"
+  description: Phase 10 — streaks, goals, spaced repetition, coach summaries, achievements.
+servers:
+  - url: http://127.0.0.1:{port}
+    variables:
+      port:
+        default: "8000"
+
+paths:
+  /motivation/streak:
+    get:
+      summary: Get current streak data
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StreakData' }
+
+  /motivation/goals:
+    get:
+      summary: List all goals
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Goal' } }
+    post:
+      summary: Create a new goal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GoalCreate' }
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Goal' }
+
+  /motivation/goals/{id}/progress:
+    get:
+      summary: Get goal progress and projection
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Goal' }
+        "404": { description: Not found }
+
+  /motivation/practice-queue:
+    get:
+      summary: Get today's practice suggestions
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, default: 3 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/PracticeSuggestion' } }
+
+  /motivation/spaced-repetition/due:
+    get:
+      summary: Get items due for review
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, default: 5 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/PracticeItem' } }
+
+  /motivation/spaced-repetition/{id}/review:
+    post:
+      summary: Record a review result (SM-2)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewResult' }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PracticeItem' }
+
+  /motivation/weekly-summary:
+    get:
+      summary: Get this week's coach summary
+      parameters:
+        - { name: week_start, in: query, schema: { type: string, format: date } }
+        - { name: refresh, in: query, schema: { type: boolean, default: false } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CoachSummary' }
+
+  /motivation/achievements:
+    get:
+      summary: List all achievements (earned + locked)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Achievement' } }
+
+  /motivation/notifications/settings:
+    get:
+      summary: Get notification preferences
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationSettings' }
+    put:
+      summary: Update notification preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotificationSettings' }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationSettings' }
+
+  /motivation/notifications/pending:
+    get:
+      summary: Get at most one notification eligible to fire right now (respects quiet hours + daily cap)
+      responses:
+        "200":
+          description: OK (may be null)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationEvent' }
+
+  /motivation/reflection/prompts:
+    get:
+      summary: Get the structured self-reflection prompts
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ReflectionPrompt' } }
+
+  /motivation/reflection/submit:
+    post:
+      summary: Submit self-reflection answers for a session (before the report is revealed)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReflectionSubmission' }
+      responses:
+        "200": { description: OK }
+
+  /motivation/calibration:
+    get:
+      summary: Get confidence-calibration trend (self-rating vs actual score)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfidenceCalibration' }
+
+  /motivation/anxiety-toolkit:
+    get:
+      summary: Get pre-interview anxiety toolkit exercises
+      responses:
+        "200": { description: OK }
+
+  /motivation/interview-day:
+    post:
+      summary: Start a multi-round Interview Day simulation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InterviewDayConfig' }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InterviewDayReport' }
+
+  /motivation/interview-day/{id}:
+    get:
+      summary: Get an Interview Day report (partial while in progress)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InterviewDayReport' }
+        "404": { description: Not found }
+
+components:
+  schemas:
+    StreakData:
+      type: object
+      properties:
+        current_streak_days: { type: integer }
+        longest_streak_days: { type: integer }
+        total_practice_days: { type: integer }
+        total_sessions: { type: integer }
+        total_practice_hours: { type: number }
+        last_practice_date: { type: string, format: date, nullable: true }
+        streak_status: { type: string, enum: [active, at_risk, broken, none] }
+        calendar: { type: object, additionalProperties: { type: integer } }
+
+    Goal:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [ielts_band, interview_score, sessions_per_week] }
+        target_value: { type: number }
+        current_value: { type: number }
+        starting_value: { type: number }
+        deadline: { type: string, format: date, nullable: true }
+        created_at: { type: string, format: date-time }
+        status: { type: string, enum: [active, achieved, abandoned] }
+        progress_percent: { type: number }
+        projected_completion: { type: string, format: date, nullable: true }
+
+    GoalCreate:
+      type: object
+      required: [type, target_value]
+      properties:
+        type: { type: string, enum: [ielts_band, interview_score, sessions_per_week] }
+        target_value: { type: number }
+        deadline: { type: string, format: date, nullable: true }
+
+    PracticeItem:
+      type: object
+      properties:
+        id: { type: string }
+        category: { type: string, enum: [behavioral, technical, pronunciation, topic] }
+        content: { type: string }
+        source_sessions: { type: array, items: { type: string } }
+        difficulty: { type: number }
+        easiness_factor: { type: number }
+        interval_days: { type: integer }
+        repetitions: { type: integer }
+        next_review_date: { type: string, format: date }
+        last_score: { type: number, nullable: true }
+        is_mastered: { type: boolean }
+
+    ReviewResult:
+      type: object
+      required: [score]
+      properties:
+        score: { type: number, minimum: 0, maximum: 5 }
+
+    CoachSummary:
+      type: object
+      properties:
+        week_start: { type: string, format: date }
+        sessions_count: { type: integer }
+        practice_time_hours: { type: number }
+        score_trend: { type: string, enum: [improving, stable, declining, no_data] }
+        narrative: { type: string }
+        focus_areas: { type: array, items: { type: string } }
+        celebration: { type: array, items: { type: string } }
+        next_week_plan: { type: array, items: { type: string } }
+        generated_at: { type: string, format: date-time }
+
+    Achievement:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        icon: { type: string }
+        desc: { type: string }
+        category: { type: string }
+        unlocked: { type: boolean }
+        unlocked_at: { type: string, format: date-time, nullable: true }
+
+    PracticeSuggestion:
+      type: object
+      properties:
+        type: { type: string, enum: [review, new_skill, improvement] }
+        title: { type: string }
+        reason: { type: string }
+        priority: { type: string, enum: [high, medium, low] }
+        action: { type: object, nullable: true }
+
+    NotificationSettings:
+      type: object
+      properties:
+        streak_reminders: { type: boolean }
+        weekly_summary: { type: boolean }
+        goal_progress: { type: boolean }
+        achievements: { type: boolean }
+        quiet_hours_start: { type: string }
+        quiet_hours_end: { type: string }
+        max_per_day: { type: integer }
+
+    NotificationEvent:
+      type: object
+      nullable: true
+      properties:
+        type: { type: string, enum: [streak_at_risk, weekly_summary_ready, goal_approaching, achievement_unlocked] }
+        title: { type: string }
+        body: { type: string }
+
+    ReflectionPrompt:
+      type: object
+      properties:
+        prompt_id: { type: string }
+        prompt: { type: string }
+        purpose: { type: string }
+
+    ReflectionSubmission:
+      type: object
+      required: [session_id, answers]
+      properties:
+        session_id: { type: string }
+        answers:
+          type: array
+          items:
+            type: object
+            properties:
+              prompt_id: { type: string }
+              response: { type: string, nullable: true }
+              self_rating: { type: number, minimum: 1, maximum: 10, nullable: true }
+
+    ConfidenceCalibration:
+      type: object
+      properties:
+        self_rating: { type: number }
+        actual_score: { type: number }
+        calibration_gap: { type: number }
+        calibration_trend: { type: string, enum: [over_confident, under_confident, well_calibrated] }
+        historical_gaps: { type: array, items: { type: number } }
+        insight: { type: string }
+
+    InterviewDayConfig:
+      type: object
+      properties:
+        company_format: { type: string, enum: [amazon, google, meta, custom], default: custom }
+        total_rounds: { type: integer, minimum: 3, maximum: 5, default: 3 }
+        break_duration_minutes: { type: integer, minimum: 5, maximum: 10, default: 10 }
+        include_lunch_break: { type: boolean, default: false }
+        fatigue_tracking: { type: boolean, default: true }
+
+    FatigueAnalysis:
+      type: object
+      properties:
+        confidence_by_round: { type: array, items: { type: number } }
+        quality_by_round: { type: array, items: { type: number } }
+        energy_trend: { type: string, enum: [sustained, gradual_decline, sharp_drop, insufficient_data] }
+        recommendation: { type: string }
+
+    RoundComparison:
+      type: object
+      properties:
+        round_number: { type: integer }
+        confidence_score: { type: number, nullable: true }
+        quality_score: { type: number, nullable: true }
+        delta_from_round_1: { type: number, nullable: true }
+
+    InterviewDayReport:
+      type: object
+      properties:
+        id: { type: string }
+        status: { type: string }
+        rounds_completed: { type: integer }
+        total_rounds: { type: integer }
+        fatigue_analysis: { $ref: '#/components/schemas/FatigueAnalysis' }
+        overall_verdict: { type: string }
+        stamina_score: { type: number, nullable: true }
+        round_comparison: { type: array, items: { $ref: '#/components/schemas/RoundComparison' } }
