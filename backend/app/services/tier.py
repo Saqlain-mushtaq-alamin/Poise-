@@ -16,8 +16,10 @@ from enum import Enum
 from app.services.hardware import HardwareProfile
 
 # Tier thresholds, from the Phase 2 spec's "Tier rules" table.
-LOCAL_FULL_MIN_VRAM_MB = 8 * 1024
-LOCAL_LITE_MIN_VRAM_MB = 4 * 1024
+# We use 7.5GB (not 8GB) as the Local Full threshold to account for GPU
+# driver VRAM overhead — a nominal 8GB card (e.g. RTX 4060) reports ~7.9-8.0GB.
+LOCAL_FULL_MIN_VRAM_MB = 7 * 1024 + 500   # 7.5 GB
+LOCAL_LITE_MIN_VRAM_MB = 4 * 1024          # 4 GB
 LOCAL_LITE_MIN_RAM_GB = 16.0
 
 
@@ -42,14 +44,14 @@ class ModelPlan:
 # (see HardwareProfile.ollama_models).
 _MODEL_PLANS: dict[HardwareTier, ModelPlan] = {
     HardwareTier.LOCAL_FULL: ModelPlan(
-        llm="qwen2.5:14b-instruct-q4_K_M",
-        vlm="qwen2-vl:7b-q4",
+        llm="qwen2.5:14b-instruct-q4_K_M",  # Best for 8GB+ VRAM; fallback to smaller if not pulled
+        vlm="llava:7b",                      # Vision model (already available)
         stt="large-v3",
         tts="xtts-v2",
         embedding="nomic-embed-text",
     ),
     HardwareTier.LOCAL_LITE: ModelPlan(
-        llm="qwen2.5:7b-instruct-q4_K_M",
+        llm="qwen3:8b",                      # Fast, fits in 4-8GB VRAM
         vlm=None,
         stt="small",
         tts="piper",
@@ -74,30 +76,43 @@ class TierRecommendation:
     warnings: list[str] = field(default_factory=list)
 
 
-def _best_gpu_free_vram_mb(profile: HardwareProfile) -> int:
+def _best_gpu_vram_mb(profile: HardwareProfile) -> tuple[int, int]:
+    """Returns (total_mb, free_mb) for the best GPU."""
     if not profile.gpus:
-        return 0
-    return max(gpu.vram_available_mb for gpu in profile.gpus)
+        return 0, 0
+    best = max(profile.gpus, key=lambda g: g.vram_total_mb)
+    return best.vram_total_mb, best.vram_available_mb
 
 
 def recommend_tier(profile: HardwareProfile) -> TierRecommendation:
-    """Classify a hardware profile per the Phase 2 tier rules table:
+    """Classify a hardware profile per the Phase 2 tier rules table.
+
+    Uses TOTAL VRAM (not free) for tier thresholds: Ollama manages its own
+    VRAM allocation, so the full card capacity is what matters, not whatever
+    is currently free from other running processes.
 
     | Condition                                   | Tier          |
     |----------------------------------------------|---------------|
-    | Any GPU with >=8GB free VRAM                  | Local Full    |
+    | Any GPU with >=8GB total VRAM (or >=7GB free) | Local Full    |
     | GPU with 4-7GB or CPU with >=16GB RAM          | Local Lite    |
     | Everything else                                | Cloud Assist  |
     """
-    free_vram_mb = _best_gpu_free_vram_mb(profile)
+    total_vram_mb, free_vram_mb = _best_gpu_vram_mb(profile)
     warnings: list[str] = []
 
-    if free_vram_mb >= LOCAL_FULL_MIN_VRAM_MB:
+    # Use the larger of total/free so a card with most VRAM in use (e.g. by
+    # a running game) doesn't incorrectly downgrade to local_lite at startup.
+    effective_vram_mb = max(total_vram_mb, free_vram_mb)
+
+    if effective_vram_mb >= LOCAL_FULL_MIN_VRAM_MB:
         tier = HardwareTier.LOCAL_FULL
-        reason = f"Detected {free_vram_mb / 1024:.1f}GB free VRAM (>=8GB threshold)."
-    elif free_vram_mb >= LOCAL_LITE_MIN_VRAM_MB:
+        reason = (
+            f"Detected {total_vram_mb / 1024:.1f}GB GPU ({free_vram_mb / 1024:.1f}GB free). "
+            "Running full local models via Ollama."
+        )
+    elif effective_vram_mb >= LOCAL_LITE_MIN_VRAM_MB:
         tier = HardwareTier.LOCAL_LITE
-        reason = f"Detected {free_vram_mb / 1024:.1f}GB free VRAM (4-7GB range)."
+        reason = f"Detected {total_vram_mb / 1024:.1f}GB GPU (4–7GB range)."
     elif profile.ram_total_gb >= LOCAL_LITE_MIN_RAM_GB:
         tier = HardwareTier.LOCAL_LITE
         reason = (
@@ -117,13 +132,21 @@ def recommend_tier(profile: HardwareProfile) -> TierRecommendation:
     if tier == HardwareTier.LOCAL_LITE and profile.ram_total_gb < 24:
         warnings.append("Low RAM may cause slowdowns when other apps are also running.")
 
-    # Users can always downgrade to a cheaper/lighter tier, or upgrade if
-    # their hardware supports it. Cloud Assist is always available as an
-    # escape hatch (it needs a BYOK key, not local resources).
+    # Ollama bonus: if Ollama is reachable and has models, ensure local tiers
+    # are in the available list even if GPU thresholds weren't met.
+    if profile.ollama_available and profile.ollama_models:
+        if tier == HardwareTier.CLOUD_ASSIST:
+            # Surprise upgrade — user has Ollama running, give them local_lite
+            tier = HardwareTier.LOCAL_LITE
+            reason = (
+                f"Ollama detected with {len(profile.ollama_models)} model(s). "
+                "Using local inference (CPU offload mode)."
+            )
+
     available = [HardwareTier.CLOUD_ASSIST]
-    if free_vram_mb >= LOCAL_LITE_MIN_VRAM_MB or profile.ram_total_gb >= LOCAL_LITE_MIN_RAM_GB:
+    if effective_vram_mb >= LOCAL_LITE_MIN_VRAM_MB or profile.ram_total_gb >= LOCAL_LITE_MIN_RAM_GB or profile.ollama_available:
         available.append(HardwareTier.LOCAL_LITE)
-    if free_vram_mb >= LOCAL_FULL_MIN_VRAM_MB:
+    if effective_vram_mb >= LOCAL_FULL_MIN_VRAM_MB:
         available.append(HardwareTier.LOCAL_FULL)
     available.sort(key=lambda t: list(HardwareTier).index(t))
 
@@ -136,5 +159,8 @@ def recommend_tier(profile: HardwareProfile) -> TierRecommendation:
     )
 
 
+import dataclasses
+
+
 def model_plan_for(tier: HardwareTier) -> ModelPlan:
-    return _MODEL_PLANS[tier]
+    return dataclasses.replace(_MODEL_PLANS[tier])
