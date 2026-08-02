@@ -113,6 +113,9 @@ def get_current_tier(
         provider_router.set_tier(chosen_tier)
         recommendation.recommended_tier = chosen_tier
         recommendation.model_plan = provider_router.model_plan
+    else:
+        # No manual override: keep provider router in sync with detected tier
+        provider_router.set_tier(recommendation.recommended_tier)
 
     return TierRecommendationResponse.from_dataclass(recommendation)
 
