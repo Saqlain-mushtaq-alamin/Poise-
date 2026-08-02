@@ -1,36 +1,132 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { AchievementShowcase, AchievementUnlockToast } from "../components/motivation/AchievementShowcase";
+import { CalibrationChart } from "../components/motivation/CalibrationChart";
+import { CoachSummaryCard } from "../components/motivation/CoachSummaryCard";
+import { GoalsSection } from "../components/motivation/GoalCard";
+import { PracticeQueue } from "../components/motivation/PracticeQueue";
+import { StreakHeatmap } from "../components/motivation/StreakHeatmap";
+import { AnxietyToolkit } from "../components/motivation/AnxietyToolkit";
+import type { Achievement } from "../../../contracts/types/motivation";
+import { pollAndDeliverNotification } from "../lib/motivationApi";
+import "../components/motivation/motivation.css";
 
-export function Dashboard() {
+/**
+ * Replaces the Phase 1 placeholder Dashboard. Keeps the existing
+ * "Start Interview" / "Practice IELTS" CTAs (pass them in as `actions`,
+ * or wire directly to your router) and adds every Phase 10 motivation
+ * signal around them, per the 10.8 wireframe.
+ */
+export function Dashboard({
+  userName = "there",
+  onStartInterview,
+  onStartIelts,
+}: {
+  userName?: string;
+  onStartInterview?: () => void;
+  onStartIelts?: () => void;
+}) {
+  const [toastAchievement, setToastAchievement] = useState<Achievement | null>(null);
+  const [showAnxietyToolkit, setShowAnxietyToolkit] = useState(false);
+
+  useEffect(() => {
+    // Cap at every 5 minutes — the backend enforces the real 1/day rule,
+    // this interval just controls how promptly we notice a pending one.
+    const id = setInterval(pollAndDeliverNotification, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
   return (
-    <div className="page dashboard">
-      <motion.div
-        className="dashboard__welcome"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)", padding: "var(--space-6)" }}>
+      <motion.h1
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        style={{ fontSize: 24, fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}
       >
-        <h1>Poise</h1>
-        <p className="dashboard__tagline">Practice until you don't have to think about it.</p>
-      </motion.div>
+        {greeting}, {userName}!
+      </motion.h1>
 
-      <div className="dashboard__cta-grid">
-        <Link to="/interview" className="dashboard__cta-card dashboard__cta-card--interview">
-          <h2>Start Interview</h2>
-          <p>Run a voice-driven mock interview, scored as you go.</p>
-        </Link>
-        <Link to="/ielts" className="dashboard__cta-card dashboard__cta-card--ielts">
-          <h2>Practice IELTS Speaking</h2>
-          <p>Part 1, 2, and 3 drills with band-score feedback.</p>
-        </Link>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gap: "var(--space-4)",
+        }}
+      >
+        <StreakHeatmap />
+        <GoalsSection />
       </div>
 
-      <section className="dashboard__recent">
-        <h3>Recent sessions</h3>
-        <div className="dashboard__empty-state">
-          <p>No sessions yet. Your first one will show up here.</p>
-        </div>
-      </section>
+      <PracticeQueue />
+
+      <div style={{ display: "flex", gap: "var(--space-4)" }}>
+        <button
+          onClick={onStartInterview}
+          style={{
+            flex: 1,
+            padding: "var(--space-4)",
+            background: "var(--color-accent-primary)",
+            color: "white",
+            border: "none",
+            borderRadius: "var(--radius-md)",
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          Start Interview →
+        </button>
+        <button
+          onClick={onStartIelts}
+          style={{
+            flex: 1,
+            padding: "var(--space-4)",
+            background: "var(--color-accent-secondary)",
+            color: "white",
+            border: "none",
+            borderRadius: "var(--radius-md)",
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          Practice IELTS →
+        </button>
+        <button
+          onClick={() => setShowAnxietyToolkit((v) => !v)}
+          style={{
+            padding: "var(--space-4)",
+            background: "var(--color-surface)",
+            color: "var(--color-text-primary)",
+            border: "none",
+            borderRadius: "var(--radius-md)",
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          🧘 Pre-Interview Prep
+        </button>
+      </div>
+
+      {showAnxietyToolkit && <AnxietyToolkit />}
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gap: "var(--space-4)",
+        }}
+      >
+        <CoachSummaryCard />
+        <CalibrationChart />
+      </div>
+
+      <AchievementShowcase />
+
+      {toastAchievement && (
+        <AchievementUnlockToast achievement={toastAchievement} onDone={() => setToastAchievement(null)} />
+      )}
     </div>
   );
 }
