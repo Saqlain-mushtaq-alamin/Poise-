@@ -52,15 +52,38 @@ export function AudioSettings({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voices]);
 
-  useEffect(() => {
+  const loadDevices = async () => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) {
       setDevicesError("This browser doesn't support listing audio devices.");
       return;
     }
-    navigator.mediaDevices
-      .enumerateDevices()
-      .then((all) => setDevices(all.filter((d) => d.kind === "audioinput")))
-      .catch((err) => setDevicesError((err as Error).message));
+    try {
+      const all = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = all.filter((d) => d.kind === "audioinput");
+      setDevices(audioInputs);
+      if (audioInputs.length > 0) {
+        setDevicesError(null);
+      }
+    } catch (err) {
+      setDevicesError((err as Error).message);
+    }
+  };
+
+  const handleRequestMic = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
+      setDevicesError(null);
+      await loadDevices();
+    } catch {
+      setDevicesError(
+        "Microphone access is blocked. Open your browser/OS settings and allow microphone for this app, then restart."
+      );
+    }
+  };
+
+  useEffect(() => {
+    loadDevices();
   }, []);
 
   const isTesting = turnState !== "idle";
@@ -72,7 +95,12 @@ export function AudioSettings({
       <div className="audio-settings__row">
         <label htmlFor="mic-device">Microphone</label>
         {devicesError ? (
-          <p className="settings-card__warning">{devicesError}</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <p className="settings-card__warning">{devicesError}</p>
+            <button type="button" onClick={handleRequestMic} style={{ width: "fit-content" }}>
+              Enable / Request Microphone Access
+            </button>
+          </div>
         ) : (
           <select
             id="mic-device"
@@ -102,16 +130,25 @@ export function AudioSettings({
       <div className="audio-settings__row">
         <label htmlFor="tts-voice">TTS voice</label>
         <div className="audio-settings__voice-picker">
-          <select id="tts-voice" value={selectedVoice} onChange={(e) => setSelectedVoice(e.target.value)}>
-            {voices.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name}
-              </option>
-            ))}
-          </select>
-          <button type="button" onClick={() => onPreviewVoice(selectedVoice)} disabled={!selectedVoice}>
-            Preview
-          </button>
+          {voices.length === 0 ? (
+            <span style={{ opacity: 0.6, fontSize: "0.875rem" }}>
+              No TTS engine installed — using placeholder tone.
+              Install <code>edge-tts</code> (<code>pip install edge-tts</code>) or Piper for real voices.
+            </span>
+          ) : (
+            <>
+              <select id="tts-voice" value={selectedVoice} onChange={(e) => setSelectedVoice(e.target.value)}>
+                {voices.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+              <button type="button" onClick={() => onPreviewVoice(selectedVoice)} disabled={!selectedVoice}>
+                Preview
+              </button>
+            </>
+          )}
         </div>
       </div>
 
