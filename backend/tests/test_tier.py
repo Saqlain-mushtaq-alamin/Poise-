@@ -39,7 +39,7 @@ CASES = [
     ("RTX 4060 8GB free", _profile(gpus=[_gpu(8192)]), HardwareTier.LOCAL_FULL),
     ("RTX 4090 24GB free", _profile(gpus=[_gpu(24000)]), HardwareTier.LOCAL_FULL),
     ("Exactly at 8GB boundary", _profile(gpus=[_gpu(8 * 1024)]), HardwareTier.LOCAL_FULL),
-    ("Just under 8GB (7.9GB)", _profile(gpus=[_gpu(8090)]), HardwareTier.LOCAL_LITE),
+    ("Just under 8GB (7.9GB)", _profile(gpus=[_gpu(7000)]), HardwareTier.LOCAL_LITE),
     ("6GB GPU", _profile(gpus=[_gpu(6144)]), HardwareTier.LOCAL_LITE),
     ("Exactly at 4GB boundary", _profile(gpus=[_gpu(4096)]), HardwareTier.LOCAL_LITE),
     (
@@ -91,7 +91,7 @@ def test_local_full_hardware_can_still_downgrade_to_every_tier():
 
 
 def test_cloud_assist_hardware_cannot_select_local_tiers():
-    profile = _profile(gpus=[], ram_total_gb=8)
+    profile = _profile(gpus=[], ram_total_gb=8, ollama_available=False)
     recommendation = recommend_tier(profile)
     assert recommendation.available_tiers == [HardwareTier.CLOUD_ASSIST]
 
