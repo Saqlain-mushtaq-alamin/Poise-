@@ -1,10 +1,248 @@
 openapi: 3.0.3
 info:
-  title: Poise Ielts API
-  version: 0.0.0
+  title: Poise IELTS Speaking API
+  version: 0.1.0
   description: >
-    Stub contract — owned by the developer assigned to this phase. Define
-    the real paths/schemas here before writing the corresponding router in
-    backend/app/routers/ielts.py, so parallel phases can code against this
-    file with mock data (see contracts/mocks/) instead of a running server.
-paths: {}
+    Phase 7 deliverable. Endpoints for running an IELTS Speaking test
+    session (Part 1/2/3), retrieving band scores, and pronunciation /
+    prosody analysis.
+
+paths:
+  /ielts/sessions:
+    post:
+      summary: Create an IELTS speaking session
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                target_band: { type: number, minimum: 0, maximum: 9, default: 6.5 }
+                topics_preference: { type: string, nullable: true }
+      responses:
+        "200":
+          description: Created session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IELTSSession' }
+
+  /ielts/sessions/{id}:
+    get:
+      summary: Get session detail including the current prompt
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IELTSSessionDetail' }
+        "404": { description: Session not found }
+
+  /ielts/sessions/{id}/start:
+    post:
+      summary: Begin the IELTS test (SETUP -> PART1_INTRO)
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IELTSSessionDetail' }
+
+  /ielts/sessions/{id}/advance:
+    post:
+      summary: >
+        Advance a non-spoken transition (examiner intro finished, cue card
+        acknowledged, prep timer elapsed). Phase 7 addition beyond the
+        base 6-endpoint contract, needed to drive the timed states.
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IELTSSessionDetail' }
+
+  /ielts/sessions/{id}/answer:
+    post:
+      summary: Submit answer for current question
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [audio_path, transcript]
+              properties:
+                audio_path: { type: string }
+                transcript: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnswerResult' }
+        "409": { description: Not in a speaking state }
+
+  /ielts/sessions/{id}/score:
+    get:
+      summary: Get IELTS band scores (session-level aggregate)
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IELTSBandScore' }
+        "409": { description: Session has not been scored yet }
+
+  /ielts/sessions/{id}/pronunciation:
+    get:
+      summary: Get pronunciation analysis for each answer in the session
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PronunciationAnalysis' }
+
+  /ielts/sessions/{id}/prosody:
+    get:
+      summary: Get prosody analysis for each answer in the session
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ProsodyAnalysis' }
+
+components:
+  parameters:
+    SessionId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+
+  schemas:
+    IELTSSession:
+      type: object
+      properties:
+        id: { type: string }
+        session_id: { type: string }
+        status:
+          type: string
+          enum: [setup, part1_intro, part1_qa, part2_cue_card, part2_prep,
+                 part2_speaking, part2_follow_up, part3_discussion, scoring, complete]
+        target_band: { type: number }
+        topics_preference: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time, nullable: true }
+
+    CueCard:
+      type: object
+      properties:
+        topic: { type: string }
+        bullets: { type: array, items: { type: string } }
+        theme: { type: string }
+
+    CurrentPrompt:
+      type: object
+      properties:
+        state: { type: string }
+        part: { type: integer, nullable: true }
+        question: { type: string, nullable: true }
+        cue_card: { $ref: '#/components/schemas/CueCard' }
+        time_budget_s: { type: integer, nullable: true }
+        is_final: { type: boolean }
+
+    IELTSSessionDetail:
+      allOf:
+        - $ref: '#/components/schemas/IELTSSession'
+        - type: object
+          properties:
+            current_prompt: { $ref: '#/components/schemas/CurrentPrompt' }
+            part1_categories: { type: array, items: { type: object } }
+            part2_cue_card: { $ref: '#/components/schemas/CueCard' }
+            part3_questions: { type: array, items: { type: string } }
+
+    AnswerResult:
+      type: object
+      properties:
+        answer_id: { type: string }
+        next_prompt: { $ref: '#/components/schemas/CurrentPrompt' }
+
+    BandDetail:
+      type: object
+      properties:
+        band: { type: number }
+        justification: { type: string }
+        strengths: { type: array, items: { type: string } }
+        areas_to_improve: { type: array, items: { type: string } }
+        example_from_response: { type: string }
+
+    IELTSBandScore:
+      type: object
+      properties:
+        fluency_and_coherence: { $ref: '#/components/schemas/BandDetail' }
+        lexical_resource: { $ref: '#/components/schemas/BandDetail' }
+        grammatical_range_accuracy: { $ref: '#/components/schemas/BandDetail' }
+        pronunciation: { $ref: '#/components/schemas/BandDetail' }
+        overall_band: { type: number }
+
+    WordPronunciationScore:
+      type: object
+      properties:
+        word: { type: string }
+        score: { type: number }
+        expected_phonemes: { type: string }
+        detected_phonemes: { type: string }
+        problem_phonemes: { type: array, items: { type: string } }
+        timestamp_ms: { type: integer }
+
+    PronunciationAnalysis:
+      type: object
+      properties:
+        word_scores: { type: array, items: { $ref: '#/components/schemas/WordPronunciationScore' } }
+        overall_score: { type: number }
+        problem_sounds: { type: array, items: { type: string } }
+        confidence_caveat: { type: string }
+        engine: { type: string, enum: [wav2vec2, heuristic_fallback] }
+
+    PauseAnalysis:
+      type: object
+      properties:
+        total_pause_time_s: { type: number }
+        avg_pause_duration_s: { type: number }
+        long_pauses:
+          type: array
+          items:
+            type: object
+            properties:
+              start_s: { type: number }
+              duration_s: { type: number }
+        natural_pauses: { type: integer }
+        unnatural_pauses: { type: integer }
+
+    ProsodyAnalysis:
+      type: object
+      properties:
+        speaking_rate_wpm: { type: number }
+        pace_assessment: { type: string, enum: [too_fast, good, too_slow] }
+        pause_analysis: { $ref: '#/components/schemas/PauseAnalysis' }
+        filler_words:
+          type: array
+          items:
+            type: object
+            properties:
+              text: { type: string }
+              timestamp_s: { type: number }
+        filler_ratio: { type: number }
+        intonation_variety: { type: number }
