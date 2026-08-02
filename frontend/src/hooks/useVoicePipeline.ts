@@ -150,7 +150,7 @@ export function useVoicePipeline({
 
       turnManager.startSpeaking();
       try {
-        const stream = await api.synthesizeSpeechStream(text);
+        const stream = await api.synthesizeSpeechStream<ReadableStream<Uint8Array>>(text);
         playback.addEventListener(
           "playback-ended",
           () => {
