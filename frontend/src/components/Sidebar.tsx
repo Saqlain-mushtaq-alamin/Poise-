@@ -13,6 +13,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/interview", label: "Interview Mode", icon: "\u{1F399}" }, // mic
   { to: "/ielts", label: "IELTS Speaking", icon: "\u{1F5E3}" }, // speech balloon
   { to: "/history", label: "Session History", icon: "\u{1F4CA}" }, // chart
+  { to: "/analytics", label: "Analytics", icon: "\u{1F4C8}" }, // trending up
   { to: "/settings", label: "Settings", icon: "\u2699" }, // gear
 ];
 
