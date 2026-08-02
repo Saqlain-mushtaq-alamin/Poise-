@@ -66,7 +66,12 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
       setBusy(true);
       setError(null);
       try {
-        const session = await api.createInterviewSession(resumeId, jdId, config, personaId);
+        const session = await api.createInterviewSession<{ session_id: string; plan: InterviewPlan }>(
+          resumeId,
+          jdId,
+          config,
+          personaId
+        );
         setSessionId(session.session_id);
         setPlan(session.plan);
         send({ type: "START_SESSION" });
@@ -74,7 +79,7 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
         send({ type: "PLAN_GENERATED" });
 
         send({ type: "BEGIN_INTERVIEW" });
-        const started = await api.startInterviewSession(session.session_id);
+        const started = await api.startInterviewSession<{ message: string }>(session.session_id);
         setCurrentMessage(started.message);
       } catch (err) {
         setError((err as Error).message);
@@ -91,7 +96,11 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
       setBusy(true);
       setError(null);
       try {
-        const result = await api.respondToWarmUp(sessionId, text);
+        const result = await api.respondToWarmUp<{
+          message: string;
+          is_complete?: boolean;
+          first_question?: string;
+        }>(sessionId, text);
         setCurrentMessage(result.message);
         if (result.is_complete) {
           send({ type: "WARM_UP_COMPLETE" });
@@ -115,8 +124,13 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
       setBusy(true);
       setError(null);
       try {
-        send({ type: "ANSWER_RECEIVED" });
-        const result = await api.submitAnswer(sessionId, text);
+        const result = await api.submitAnswer<{
+          score: number;
+          feedback: string;
+          reaction: string | null;
+          next_action: string;
+          next_message?: string;
+        }>(sessionId, { text });
         setLastFeedback({ score: result.score, feedback: result.feedback, reaction: result.reaction });
 
         if (result.next_action === "follow_up") {
@@ -160,7 +174,7 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
 
   const fetchEvaluations = useCallback(async () => {
     if (!api || !sessionId) return [];
-    return api.getInterviewEvaluations(sessionId);
+    return api.getInterviewEvaluations<EvaluationRecord[]>(sessionId);
   }, [api, sessionId]);
 
   const snapshotValue = actor.getSnapshot().value;
