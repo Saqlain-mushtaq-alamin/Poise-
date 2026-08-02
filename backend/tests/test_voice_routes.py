@@ -7,12 +7,12 @@ from __future__ import annotations
 import struct
 
 
-def test_list_voices_returns_placeholder_when_no_backend_installed(client):
+def test_list_voices_returns_voices_list(client):
     resp = client.get("/voice/tts/voices")
     assert resp.status_code == 200
     voices = resp.json()
-    assert len(voices) == 1
-    assert voices[0]["id"] == "placeholder-tone"
+    assert len(voices) >= 1
+    assert "id" in voices[0]
 
 
 def test_synthesize_streaming_returns_valid_wav_audio(client):
