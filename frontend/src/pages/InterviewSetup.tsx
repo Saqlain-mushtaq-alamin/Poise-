@@ -18,11 +18,22 @@ const DEFAULT_CONFIG: Partial<InterviewConfig> = {
   difficulty: "medium",
 };
 
+const DEFAULT_PERSONAS: Persona[] = [
+  { id: "professional", name: "Professional Recruiter", style: "Formal and structured", voice: "alloy", system_prompt: "" },
+  { id: "friendly", name: "Friendly Peer", style: "Casual and encouraging", voice: "echo", system_prompt: "" },
+  { id: "tough", name: "Strict Technical Lead", style: "Direct and challenging", voice: "onyx", system_prompt: "" },
+];
+
+const DEFAULT_COMPANY_FORMATS: CompanyFormat[] = [
+  { id: "faang", name: "FAANG / Big Tech", structure: ["Behavioral", "Technical"], framework: "STAR", scoring_note: "Rigorous evaluation", principles: ["Leadership"] },
+  { id: "startup", name: "Fast-Paced Startup", structure: ["Practical", "Culture"], framework: "Agile", scoring_note: "Focus on execution", principles: ["Ownership"] },
+];
+
 export function InterviewSetup({ api }: InterviewSetupProps) {
   const session = useInterviewSession(api);
 
-  const [personas, setPersonas] = useState<Persona[]>([]);
-  const [companyFormats, setCompanyFormats] = useState<CompanyFormat[]>([]);
+  const [personas, setPersonas] = useState<Persona[]>(DEFAULT_PERSONAS);
+  const [companyFormats, setCompanyFormats] = useState<CompanyFormat[]>(DEFAULT_COMPANY_FORMATS);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [jdText, setJdText] = useState("");
   const [personaId, setPersonaId] = useState("professional");
@@ -31,14 +42,54 @@ export function InterviewSetup({ api }: InterviewSetupProps) {
   const [localError, setLocalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Ollama model selection
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [modelSaving, setModelSaving] = useState(false);
+
   useEffect(() => {
-    api?.listPersonas().then(setPersonas).catch(() => setPersonas([]));
-    api?.listCompanyFormats().then(setCompanyFormats).catch(() => setCompanyFormats([]));
+    if (api) {
+      api
+        .listPersonas<Persona[]>()
+        .then((res) => setPersonas(res && res.length ? res : DEFAULT_PERSONAS))
+        .catch(() => setPersonas(DEFAULT_PERSONAS));
+
+      api
+        .listCompanyFormats<CompanyFormat[]>()
+        .then((res) => setCompanyFormats(res && res.length ? res : DEFAULT_COMPANY_FORMATS))
+        .catch(() => setCompanyFormats(DEFAULT_COMPANY_FORMATS));
+
+      // Load available Ollama models + currently selected model
+      api
+        .getModelConfig<{ selected_model: string; available_models: string[] }>()
+        .then((res) => {
+          if (res.available_models && res.available_models.length) {
+            setAvailableModels(res.available_models);
+          }
+          if (res.selected_model) {
+            setSelectedModel(res.selected_model);
+          }
+        })
+        .catch(() => {});
+    }
   }, [api]);
+
+  async function handleModelChange(modelName: string) {
+    setSelectedModel(modelName);
+    if (!api) return;
+    setModelSaving(true);
+    try {
+      await api.setModelConfig(modelName);
+    } catch {
+      // best effort
+    } finally {
+      setModelSaving(false);
+    }
+  }
 
   async function handleStart() {
     if (!api) {
-      setLocalError("Sidecar not connected yet");
+      setLocalError("Sidecar not connected yet — please wait for the backend to start.");
       return;
     }
     if (!resumeFile) {
@@ -53,8 +104,8 @@ export function InterviewSetup({ api }: InterviewSetupProps) {
     setSubmitting(true);
     setLocalError(null);
     try {
-      const { resume_id } = await api.parseResume(resumeFile);
-      const { jd_id } = await api.parseJD(jdText);
+      const { resume_id } = await api.parseResume<{ resume_id: string }>(resumeFile);
+      const { jd_id } = await api.parseJD<{ jd_id: string }>(jdText);
       await session.createAndStart(
         resume_id,
         jd_id,
@@ -62,7 +113,21 @@ export function InterviewSetup({ api }: InterviewSetupProps) {
         personaId
       );
     } catch (err) {
-      setLocalError((err as Error).message);
+      const msg = (err as Error).message ?? String(err);
+      // Make common provider errors actionable
+      if (
+        msg.includes("no API key") ||
+        msg.includes("API key") ||
+        msg.includes("Cloud Assist") ||
+        msg.includes("provider") ||
+        msg.includes("No model configured")
+      ) {
+        setLocalError(
+          `LLM not configured: ${msg}. Go to Settings → Hardware & model providers to add an API key or select Ollama.`
+        );
+      } else {
+        setLocalError(msg);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -89,6 +154,12 @@ export function InterviewSetup({ api }: InterviewSetupProps) {
   return (
     <div className="page">
       <h1>Interview Mode</h1>
+
+      {!api && (
+        <p className="settings-card__warning">
+          ⚠️ Sidecar not connected — start the backend or wait a moment for it to initialize.
+        </p>
+      )}
 
       {(localError || session.error) && (
         <p className="settings-card__warning">{localError || session.error}</p>
@@ -144,6 +215,30 @@ export function InterviewSetup({ api }: InterviewSetupProps) {
             ))}
           </select>
         </div>
+        <div className="audio-settings__row">
+          <label htmlFor="model-select">
+            AI model
+            {modelSaving && <span style={{ marginLeft: "0.5rem", fontSize: "0.8rem", opacity: 0.7 }}>(saving…)</span>}
+          </label>
+          {availableModels.length > 0 ? (
+            <select
+              id="model-select"
+              value={selectedModel}
+              onChange={(e) => handleModelChange(e.target.value)}
+              disabled={modelSaving}
+            >
+              {availableModels.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span style={{ opacity: 0.6 }}>
+              {api ? "Loading models…" : "Connect sidecar to see models"}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="settings-card">
@@ -188,10 +283,27 @@ export function InterviewSetup({ api }: InterviewSetupProps) {
             Coding
           </label>
         </div>
+        <div className="audio-settings__row">
+          <label htmlFor="difficulty-select">Difficulty</label>
+          <select
+            id="difficulty-select"
+            value={config.difficulty ?? "medium"}
+            onChange={(e) =>
+              setConfig((c) => ({
+                ...c,
+                difficulty: e.target.value as "easy" | "medium" | "hard",
+              }))
+            }
+          >
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
       </div>
 
-      <button type="button" onClick={handleStart} disabled={submitting || session.busy}>
-        {submitting || session.busy ? "Setting up\u2026" : "Start Interview"}
+      <button type="button" onClick={handleStart} disabled={!api || submitting || session.busy}>
+        {submitting || session.busy ? "Setting up…" : "Start Interview"}
       </button>
     </div>
   );
