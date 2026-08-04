@@ -16,7 +16,7 @@ describe("ModelConfigCard", () => {
       />
     );
 
-    expect(screen.getByText("qwen2.5:14b")).toBeInTheDocument();
+    expect(screen.getByText(/qwen2\.5:14b/)).toBeInTheDocument();
     expect(screen.getByText("qwen2-vl:7b")).toBeInTheDocument();
     expect(screen.getByText("large-v3")).toBeInTheDocument();
   });
