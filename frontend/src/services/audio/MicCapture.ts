@@ -44,17 +44,33 @@ export class MicCapture extends EventTarget {
 
     const sampleRate = options.sampleRate ?? DEFAULT_SAMPLE_RATE;
 
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        deviceId: options.deviceId ? { exact: options.deviceId } : undefined,
-        sampleRate,
-        channelCount: 1,
-        echoCancellation: true,
-        noiseSuppression: true,
-      },
-    });
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: options.deviceId ? { exact: options.deviceId } : undefined,
+          sampleRate,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+    } catch {
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: options.deviceId ? { exact: options.deviceId } : undefined,
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+    }
 
-    this.audioContext = new AudioContext({ sampleRate });
+    const AudioCtxClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    this.audioContext = new AudioCtxClass({ sampleRate });
+    if (this.audioContext.state === "suspended") {
+      await this.audioContext.resume().catch(() => {});
+    }
     await this.audioContext.audioWorklet.addModule(WORKLET_MODULE_URL);
 
     this.sourceNode = this.audioContext.createMediaStreamSource(this.stream);
