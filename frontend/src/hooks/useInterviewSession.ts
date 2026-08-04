@@ -162,12 +162,12 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
     setBusy(true);
     try {
       await api.endInterviewSession(sessionId);
+    } catch (err) {
+      console.warn("endInterviewSession API call error:", err);
+    } finally {
       send({ type: "END_INTERVIEW" });
       send({ type: "WRAP_UP_QUESTIONS" });
       send({ type: "SESSION_FINALIZED" });
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
       setBusy(false);
     }
   }, [api, sessionId, send]);
