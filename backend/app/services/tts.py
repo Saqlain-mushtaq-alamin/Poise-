@@ -220,6 +220,35 @@ class TTSEngine:
         for chunk in chunk_wav_pcm(samples, chunk_size=chunk_samples):
             yield pcm16_to_wav_bytes(chunk)
 
+    async def synthesize_complete(self, text: str, voice: str = "default") -> bytes:
+        """Returns a single, browser-decodable audio blob for the full text.
+
+        - Edge TTS path: collects raw MP3/OGG data as-is (content type is
+          handled by the caller) — this is already a valid MP3 stream.
+        - Placeholder path: generates one full WAV (not chunked) so the
+          browser can decode it without issues.
+
+        Use this for HTTP (non-streaming) responses. Use `synthesize_stream`
+        for WebSocket streaming where chunks are played progressively.
+        """
+        is_edge_voice = voice and voice.startswith("en-")
+
+        # Edge TTS — concatenate raw audio bytes (MP3 format, not WAV)
+        if is_edge_voice and self._probe_edge_tts():
+            try:
+                chunks: list[bytes] = []
+                async for chunk in self._synthesize_edge_tts(text, voice):
+                    chunks.append(chunk)
+                if chunks:
+                    return b"".join(chunks)
+            except Exception:  # noqa: BLE001
+                logger.exception("Edge TTS complete synthesis failed; falling back")
+
+        # Placeholder — generate a single full WAV (not split into chunks)
+        duration = estimate_speech_duration_seconds(text or " ")
+        samples = generate_tone_samples(duration_seconds=duration)
+        return pcm16_to_wav_bytes(samples)
+
 
 _engine_instance = TTSEngine()
 
