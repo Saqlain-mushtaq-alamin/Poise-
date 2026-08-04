@@ -60,6 +60,8 @@ export const interviewMachine = createMachine({
     warmUp: {
       on: {
         WARM_UP_COMPLETE: "inProgress.asking",
+        END_INTERVIEW: "wrappingUp",
+        TIME_EXCEEDED: "wrappingUp",
         PAUSE: { target: "paused", actions: assign({ pausedFrom: "warmUp" }) },
       },
     },
