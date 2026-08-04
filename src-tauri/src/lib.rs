@@ -25,6 +25,7 @@ pub fn run() {
             spawn_key_rehydration(app.handle().clone());
             Ok(())
         })
+
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 let app = window.app_handle().clone();
@@ -36,6 +37,7 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running the Poise application");
 }
+
 
 /// Waits for the sidecar's first healthy report, then pushes any keys
 /// already sitting in the OS keychain into it — this is what makes BYOK
