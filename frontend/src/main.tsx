@@ -6,6 +6,7 @@ import "./styles/theme-dark.css";
 import "./styles/theme-light.css";
 import "./styles/index.css";
 import "./styles/shell.css";
+import "./styles/videoCall.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
