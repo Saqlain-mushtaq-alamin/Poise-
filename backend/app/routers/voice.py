@@ -62,24 +62,33 @@ def list_voices(tts: TTSEngine = Depends(get_tts_engine)) -> list[VoiceInfoRespo
 async def synthesize(
     body: SynthesizeRequest, tts: TTSEngine = Depends(get_tts_engine)
 ) -> StreamingResponse:
-    """Streams WAV chunks as `audio/wav`. `stream=False` is honored by
-    simply consuming the whole generator before responding — the frontend
-    always receives the same media type either way."""
+    """Synthesize speech for the given text.
 
+    - stream=True  (default): yields WAV chunks progressively (good for
+      streaming players or the WebSocket fallback path).
+    - stream=False: returns a single, browser-decodable audio blob via
+      `synthesize_complete()`. Edge TTS → MP3; placeholder → WAV.
+      The frontend's HTMLAudioElement plays either without any configuration.
+    """
+    if not body.stream:
+        # Use synthesize_complete for a single clean audio blob
+        audio_bytes = await tts.synthesize_complete(body.text, voice=body.voice)
+        # Edge TTS returns MP3; placeholder returns WAV — detect by magic bytes
+        is_mp3 = audio_bytes[:3] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2", b"ID3")
+        media_type = "audio/mpeg" if is_mp3 else "audio/wav"
+
+        async def complete_body():
+            yield audio_bytes
+
+        return StreamingResponse(complete_body(), media_type=media_type)
+
+    # Streaming path (used by the WebSocket TTS endpoint)
     async def full_body():
         async for chunk in tts.synthesize_stream(body.text, voice=body.voice):
             yield chunk
 
-    if not body.stream:
-        chunks = [c async for c in tts.synthesize_stream(body.text, voice=body.voice)]
-
-        async def single_response():
-            for c in chunks:
-                yield c
-
-        return StreamingResponse(single_response(), media_type="audio/wav")
-
     return StreamingResponse(full_body(), media_type="audio/wav")
+
 
 
 @router.get("/devices", response_model=list[AudioDeviceResponse])
@@ -174,3 +183,38 @@ async def stt_stream(websocket: WebSocket, stt: WhisperSTT = Depends(get_stt)) -
             await websocket.close()
         except RuntimeError:
             pass  # already closed by the client disconnecting
+
+
+@router.websocket("/tts/stream")
+async def tts_stream(websocket: WebSocket, tts: TTSEngine = Depends(get_tts_engine)) -> None:
+    """Real-time TTS streaming WebSocket for the video-call interview room.
+
+    Client sends one JSON message: {"text": "...", "voice": "en-US-AvaNeural"}
+    Server replies with binary WAV chunk frames as fast as they are synthesised,
+    then sends a final JSON {"done": true} frame.
+
+    This lets the frontend start playing audio before the whole utterance is
+    synthesised — important for responsiveness in live interview sessions.
+    """
+    await websocket.accept()
+    try:
+        raw = await websocket.receive_text()
+        import json as _json
+
+        payload = _json.loads(raw)
+        text = payload.get("text", "")
+        voice = payload.get("voice", "en-US-AvaNeural")
+
+        async for chunk in tts.synthesize_stream(text, voice=voice):
+            if chunk:
+                await websocket.send_bytes(chunk)
+
+        await websocket.send_json({"done": True})
+    except WebSocketDisconnect:
+        logger.debug("TTS stream client disconnected early")
+    finally:
+        try:
+            await websocket.close()
+        except RuntimeError:
+            pass
+
