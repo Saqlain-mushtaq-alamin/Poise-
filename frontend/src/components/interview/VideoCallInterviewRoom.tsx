@@ -414,7 +414,7 @@ export function VideoCallInterviewRoom({
         <div className="vcir__transcript-area">
           <div className="vcir__transcript-label">
             <span className={`vcir__transcript-dot${voice.isSpeaking ? " vcir__transcript-dot--active" : ""}`} />
-            {voice.isSpeaking ? "Speaking…" : "Listening — pause 2.5 s to submit"}
+            {voice.isSpeaking ? "Speaking… (stop for 2.5 s to auto-submit)" : voice.transcript ? "Pause detected — will submit shortly" : "Listening for your answer…"}
           </div>
           {displayTranscript && (
             <div className="vcir__transcript-text">
@@ -426,7 +426,7 @@ export function VideoCallInterviewRoom({
           )}
           {!voice.speechApiAvailable && (
             <p className="vcir__transcript-hint" style={{ color: "var(--color-accent-info, #60a5fa)" }}>
-              🎙️ Using local backend speech recognition (Whisper STT).
+              🎤 Whisper STT active (Bluetooth/headphone mode). Auto-submits after 2.5 s pause, or 45 s max.
             </p>
           )}
           <p className="vcir__transcript-hint">
