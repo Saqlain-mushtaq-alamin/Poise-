@@ -111,7 +111,12 @@ export function useVoiceInterview({
     setSpeechApiAvailable(!!SR);
   }, []);
 
-  // ---- AI audio level (from HTMLAudioElement via AudioContext analyser) ----
+  // ---- AI audio level (simulated for visualizer without muting HTMLAudioElement) ----
+  function stopAILevelPoll() {
+    cancelAnimationFrame(aiLevelRafRef.current);
+    setAiAudioLevel(0);
+  }
+
   function startAILevelPoll(audio: HTMLAudioElement) {
     stopAILevelPoll();
     function tick() {
