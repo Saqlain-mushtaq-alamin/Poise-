@@ -200,72 +200,77 @@ export function useVoiceInterview({
 
     let backendSucceeded = false;
 
-    // Try backend TTS first
+    // 1. Try Backend Audio (WAV/TTS from backend)
     try {
-      const url = `${backendBaseUrl}/voice/tts/synthesize`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice, stream: false }),
-      });
+      if (backendBaseUrl) {
+        const url = `${backendBaseUrl}/voice/tts/synthesize`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, voice, stream: false }),
+        });
 
-      if (!res.ok) throw new Error(`TTS ${res.status}`);
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      aiBlobUrlRef.current = blobUrl;
+        if (res.ok) {
+          const blob = await res.blob();
+          if (blob.size > 100) {
+            const blobUrl = URL.createObjectURL(blob);
+            aiBlobUrlRef.current = blobUrl;
+            const audio = new Audio(blobUrl);
+            audio.volume = 1.0;
+            aiAudioRef.current = audio;
 
-      const audio = new Audio(blobUrl);
-      aiAudioRef.current = audio;
+            await new Promise<void>((resolve) => {
+              let done = false;
+              const finish = (success: boolean) => {
+                if (done) return;
+                done = true;
+                stopAILevelPoll();
+                if (success) backendSucceeded = true;
+                if (aiBlobUrlRef.current) {
+                  URL.revokeObjectURL(aiBlobUrlRef.current);
+                  aiBlobUrlRef.current = null;
+                }
+                aiAudioRef.current = null;
+                resolve();
+              };
 
-      // Detect if audio actually plays (Bluetooth headphone routing fix)
-      // We give it 1.5 seconds — if currentTime hasn't advanced, it's silent
-      await new Promise<void>((resolve) => {
-        let checkTimer: ReturnType<typeof setTimeout>;
-        let playbackConfirmed = false;
+              audio.onended = () => finish(true);
+              audio.onerror = () => finish(false);
 
-        const cleanup = () => {
-          clearTimeout(checkTimer);
-          stopAILevelPoll();
-          URL.revokeObjectURL(blobUrl);
-          aiBlobUrlRef.current = null;
-          if (phaseRef.current === "ai-speaking") setPhase("idle");
-          resolve();
-        };
-
-        audio.onended = () => { backendSucceeded = true; cleanup(); };
-        audio.onerror = () => { cleanup(); };
-
-        startAILevelPoll(audio);
-        audio.play().then(() => {
-          // Check after 1.5s if audio is actually progressing
-          checkTimer = setTimeout(() => {
-            if (audio.currentTime > 0.1) {
-              playbackConfirmed = true;
-              backendSucceeded = true;
-            } else if (!playbackConfirmed) {
-              // Audio not progressing — Bluetooth headphone routing issue
-              console.warn("[TTS] Audio blob not playing (BT headphone routing?), falling back to speechSynthesis");
-              audio.pause();
-              cleanup();
-              // Will fall through to browser TTS below
-            }
-          }, 1500);
-        }).catch(() => { cleanup(); });
-      });
+              startAILevelPoll(audio);
+              audio.play().then(() => {
+                // If after 1.2s audio hasn't progressed, fallback to browser TTS
+                setTimeout(() => {
+                  if (!done && audio.currentTime <= 0.01) {
+                    console.warn("[TTS] Audio playback stalled, falling back to browser TTS");
+                    audio.pause();
+                    finish(false);
+                  }
+                }, 1200);
+              }).catch((err) => {
+                console.warn("[TTS] audio.play() blocked/failed:", err);
+                finish(false);
+              });
+            });
+          }
+        }
+      }
     } catch (err) {
       console.warn("[useVoiceInterview] Backend TTS failed:", err);
     }
 
-    // Fallback: browser speechSynthesis (works with Bluetooth headphones)
-    if (!backendSucceeded && phaseRef.current !== "idle") {
+    // 2. Fallback: Browser SpeechSynthesis (guaranteed output on Windows / BT headphones)
+    if (!backendSucceeded) {
+      console.info("[TTS] Using browser speechSynthesis fallback for message:", text.slice(0, 30));
       setPhase("ai-speaking");
       try {
         await speakWithBrowserTTS(text, voice);
-      } catch {
-        // ignore
+      } catch (err) {
+        console.warn("[TTS] Browser TTS error:", err);
       }
-      if (phaseRef.current === "ai-speaking") setPhase("idle");
     }
+
+    if (phaseRef.current === "ai-speaking") setPhase("idle");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backendBaseUrl, cancelAISpeech, enabled]);
 
