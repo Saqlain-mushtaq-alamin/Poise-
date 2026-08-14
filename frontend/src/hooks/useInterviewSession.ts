@@ -23,6 +23,7 @@ interface UseInterviewSessionResult {
   respondToWarmUp: (text: string) => Promise<void>;
   submitAnswer: (text: string) => Promise<void>;
   endSession: () => Promise<void>;
+  resetSession: () => void;
   fetchEvaluations: () => Promise<EvaluationRecord[]>;
 }
 
@@ -177,6 +178,15 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
     return api.getInterviewEvaluations<EvaluationRecord[]>(sessionId);
   }, [api, sessionId]);
 
+  const resetSession = useCallback(() => {
+    setSessionId(null);
+    setPlan(null);
+    setCurrentMessage(null);
+    setLastFeedback(null);
+    setError(null);
+    setBusy(false);
+  }, []);
+
   const snapshotValue = actor.getSnapshot().value;
   const machineState =
     typeof snapshotValue === "string" ? snapshotValue : JSON.stringify(snapshotValue);
@@ -194,6 +204,7 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
     respondToWarmUp,
     submitAnswer,
     endSession,
+    resetSession,
     fetchEvaluations,
   };
 }
