@@ -51,10 +51,10 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
 
   const send = useCallback(
     (event: { type: string }) => {
-      actor.send(event as never);
+      actorRef.current.send(event as never);
       forceRender((n) => n + 1);
     },
-    [actor]
+    []
   );
 
   const createAndStart = useCallback(
@@ -183,15 +183,20 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
   }, [api, sessionId]);
 
   const resetSession = useCallback(() => {
+    // Stop the old machine and create a brand-new one so state resets to idle
+    try { actorRef.current.stop(); } catch { /* ok */ }
+    actorRef.current = createActor(interviewMachine).start();
     setSessionId(null);
     setPlan(null);
     setCurrentMessage(null);
     setLastFeedback(null);
     setError(null);
     setBusy(false);
+    forceRender((n) => n + 1);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const snapshotValue = actor.getSnapshot().value;
+  const snapshotValue = actorRef.current.getSnapshot().value;
   const machineState =
     typeof snapshotValue === "string" ? snapshotValue : JSON.stringify(snapshotValue);
 
