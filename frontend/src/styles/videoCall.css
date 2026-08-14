@@ -676,4 +676,88 @@
   font-family: var(--font-mono);
   font-size: 0.85rem;
   color: var(--color-text-muted);
+  margin-bottom: var(--space-6);
 }
+
+/* Back button on complete screen */
+.vcir__complete-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-4);
+}
+
+.vcir__complete-back-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: var(--space-3) var(--space-6);
+  transition: background var(--transition-fast), color var(--transition-fast),
+    transform var(--transition-fast);
+  letter-spacing: 0.02em;
+}
+
+.vcir__complete-back-btn:hover {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.35);
+  color: var(--color-accent-primary);
+  transform: translateY(-2px);
+}
+
+/* ── Mic error banner ── */
+.vcir__mic-error-banner {
+  padding: var(--space-4) var(--space-6);
+  background: rgba(220, 50, 50, 0.1);
+  border-left: 4px solid var(--color-accent-danger);
+  border-top: 1px solid rgba(220, 50, 50, 0.2);
+  flex-shrink: 0;
+}
+
+.vcir__mic-error-header {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--color-accent-danger);
+  margin-bottom: var(--space-2);
+}
+
+.vcir__mic-error-body {
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0 0 var(--space-3) 0;
+  white-space: pre-wrap;
+}
+
+.vcir__mic-error-actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.vcir__mic-error-retry,
+.vcir__mic-error-text {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: var(--space-2) var(--space-4);
+  transition: background var(--transition-fast);
+}
+
+.vcir__mic-error-retry:hover {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.3);
+  color: var(--color-accent-primary);
+}
+
+.vcir__mic-error-text:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
