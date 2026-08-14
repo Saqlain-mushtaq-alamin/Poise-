@@ -186,6 +186,7 @@ export function InterviewSetup({ api }: InterviewSetupProps) {
         onSubmitWarmUp={session.respondToWarmUp}
         onSubmitAnswer={session.submitAnswer}
         onEnd={session.endSession}
+        onBack={session.resetSession}
         backendBaseUrl={backendBaseUrl}
         personaName={selectedPersona.name}
         personaVoice={selectedPersona.voice ?? "en-US-AvaNeural"}
