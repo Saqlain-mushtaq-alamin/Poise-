@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import type { PoiseAPI } from "../lib/api";
 import type { EvaluationRecord, InterviewConfig, InterviewPlan } from "../lib/types";
@@ -32,9 +32,13 @@ interface UseInterviewSessionResult {
  * API endpoints. The machine here mirrors the state the backend already
  * tracks — this hook drives it forward from API responses rather than
  * duplicating any transition logic; the source of truth stays server-side.
+ *
+ * The XState actor is stored in a ref so we can fully recreate it on
+ * resetSession() — otherwise the machine stays stuck in "completed" forever.
  */
 export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionResult {
-  const actor = useMemo(() => createActor(interviewMachine).start(), []);
+  // Use a ref so we can replace the actor without re-mounting the whole component
+  const actorRef = useRef(createActor(interviewMachine).start());
   const [, forceRender] = useState(0);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [plan, setPlan] = useState<InterviewPlan | null>(null);
