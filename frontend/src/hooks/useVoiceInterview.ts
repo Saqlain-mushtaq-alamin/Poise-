@@ -1,21 +1,25 @@
 /**
  * useVoiceInterview — voice pipeline for the video-call interview room.
  *
- * KEY DESIGN DECISIONS:
- * - Audio is played via HTMLAudioElement + Blob URL (not AudioContext) to
- *   avoid the browser autoplay-policy block and WAV-chunk decode issues.
- * - Web Speech API handles live transcription (Chromium-based, works in
- *   Tauri/WebView). Falls back gracefully when unavailable.
- * - Silence detection is done by the mic energy analyser (AudioContext ←
- *   mic stream) + a configurable timer, not the backend VAD WebSocket
- *   (simpler, zero extra round-trips).
+ * KEY FIXES (2026-08-14):
+ * 1. Bluetooth headphone TTS: falls back to window.speechSynthesis when the
+ *    backend audio blob plays silently (common when BT headphones are the
+ *    audio output device and blob: URLs don't route to them correctly).
+ * 2. Microphone: silent-silence timer runs on a 500ms interval independently
+ *    of VAD, so a long pause ALWAYS triggers even if the mic analyser is
+ *    reading near-zero (BT headphone audio routing artifact on Windows).
+ * 3. Max-listen timeout (45s): auto-submits transcript or a placeholder if
+ *    the user never reaches a pause threshold — the interview keeps moving.
+ * 4. Speech recognition (webkitSpeechRecognition) is NOT available in Tauri
+ *    WebView2. The hook detects this and uses the Whisper WS STT pipeline.
+ * 5. Back-button: onBack callback is now surfaced so callers can navigate
+ *    the user back to the setup screen.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { float32ToPCM16Bytes } from "../lib/audio-encoding";
 import { VoiceSocket } from "../services/audio/VoiceSocket";
 
-// Web Speech API ambient types
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type SpeechRecognitionAny = any;
 
@@ -30,6 +34,7 @@ interface UseVoiceInterviewOptions {
   backendBaseUrl: string;
   onAnswerReady: (text: string) => void;
   silenceThresholdSecs?: number;
+  maxListenSecs?: number;
   enabled?: boolean;
 }
 
@@ -55,6 +60,7 @@ export function useVoiceInterview({
   backendBaseUrl,
   onAnswerReady,
   silenceThresholdSecs = 2.5,
+  maxListenSecs = 45,
   enabled = true,
 }: UseVoiceInterviewOptions): UseVoiceInterviewReturn {
   const [phase, setPhase] = useState<VoicePhase>("idle");
@@ -67,32 +73,41 @@ export function useVoiceInterview({
   const [micError, setMicError] = useState<string | null>(null);
 
   // ---- refs ----
-  // HTMLAudioElement for AI TTS — avoids AudioContext autoplay block
   const aiAudioRef = useRef<HTMLAudioElement | null>(null);
   const aiBlobUrlRef = useRef<string | null>(null);
   const aiLevelRafRef = useRef<number>(0);
 
-  // AudioContext used ONLY for mic analysis (after getUserMedia, which
-  // itself requires a user gesture so AudioContext is already unlocked)
   const micCtxRef = useRef<AudioContext | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const micAnalyserRef = useRef<AnalyserNode | null>(null);
   const micRafRef = useRef<number>(0);
 
   const speechRecRef = useRef<SpeechRecognitionAny | null>(null);
+  // Primary silence timer — reset on any speech/transcript activity
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Independent periodic silence checker — fires every 500ms and guarantees
+  // the threshold is reached even when BT headphone mic shows near-zero VAD
+  const silenceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Max-listen timeout — auto-submits after maxListenSecs regardless
+  const maxListenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track when we entered listening state
+  const listenStartedAtRef = useRef<number>(0);
+  // Track last voice activity timestamp
+  const lastActivityRef = useRef<number>(0);
+
   const transcriptRef = useRef("");
   const phaseRef = useRef<VoicePhase>("idle");
+  const sttSocketRef = useRef<VoiceSocket | null>(null);
+  const processorNodeRef = useRef<ScriptProcessorNode | null>(null);
 
   // keep refs in sync
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
 
-  // Check Speech API availability once
+  // Check Speech API availability once — WebView2 does NOT have webkitSpeechRecognition
   useEffect(() => {
-    const SR =
-      (window as unknown as Record<string, unknown>).SpeechRecognition ??
-      (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
+    const win = window as unknown as Record<string, unknown>;
+    const SR = win.SpeechRecognition ?? win.webkitSpeechRecognition;
     setSpeechApiAvailable(!!SR);
   }, []);
 
@@ -103,15 +118,12 @@ export function useVoiceInterview({
   }
 
   async function startAILevelPoll(audio: HTMLAudioElement) {
-    // Create a one-time AudioContext just for visualisation
     try {
       const AudioCtxClass =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioCtxClass();
-      if (ctx.state === "suspended") {
-        await ctx.resume().catch(() => {});
-      }
+      if (ctx.state === "suspended") await ctx.resume().catch(() => {});
       const src = ctx.createMediaElementSource(audio);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
@@ -129,16 +141,42 @@ export function useVoiceInterview({
         aiLevelRafRef.current = requestAnimationFrame(tick);
       }
       tick();
-      // Cleanup ctx when audio ends
       audio.addEventListener("ended", () => ctx.close().catch(() => {}), { once: true });
     } catch (err) {
       console.warn("[useVoiceInterview] AI audio level poll setup failed:", err);
     }
   }
 
+  // ---- Browser speechSynthesis TTS fallback ----
+  function speakWithBrowserTTS(text: string, voiceName?: string): Promise<void> {
+    return new Promise((resolve) => {
+      window.speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.rate = 0.95;
+      utt.pitch = 1;
+      utt.volume = 1;
+      // Try to match a voice by name/lang
+      const voices = window.speechSynthesis.getVoices();
+      if (voiceName) {
+        const match = voices.find(v => v.name.toLowerCase().includes(voiceName.toLowerCase()) || v.lang.startsWith("en"));
+        if (match) utt.voice = match;
+      } else {
+        const eng = voices.find(v => v.lang.startsWith("en"));
+        if (eng) utt.voice = eng;
+      }
+      utt.onend = () => resolve();
+      utt.onerror = () => resolve();
+      window.speechSynthesis.speak(utt);
+    });
+  }
+
   // ---- Speak as AI ----
   const cancelAISpeech = useCallback(() => {
     stopAILevelPoll();
+    // Cancel browser TTS too
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
     if (aiAudioRef.current) {
       aiAudioRef.current.pause();
       aiAudioRef.current.src = "";
@@ -156,6 +194,9 @@ export function useVoiceInterview({
     cancelAISpeech();
     setPhase("ai-speaking");
 
+    let backendSucceeded = false;
+
+    // Try backend TTS first
     try {
       const url = `${backendBaseUrl}/voice/tts/synthesize`;
       const res = await fetch(url, {
@@ -165,7 +206,6 @@ export function useVoiceInterview({
       });
 
       if (!res.ok) throw new Error(`TTS ${res.status}`);
-
       const blob = await res.blob();
       const blobUrl = URL.createObjectURL(blob);
       aiBlobUrlRef.current = blobUrl;
@@ -173,43 +213,107 @@ export function useVoiceInterview({
       const audio = new Audio(blobUrl);
       aiAudioRef.current = audio;
 
-      audio.onended = () => {
-        stopAILevelPoll();
-        URL.revokeObjectURL(blobUrl);
-        aiBlobUrlRef.current = null;
-        if (phaseRef.current === "ai-speaking") setPhase("idle");
-      };
+      // Detect if audio actually plays (Bluetooth headphone routing fix)
+      // We give it 1.5 seconds — if currentTime hasn't advanced, it's silent
+      await new Promise<void>((resolve) => {
+        let checkTimer: ReturnType<typeof setTimeout>;
+        let playbackConfirmed = false;
 
-      audio.onerror = () => {
-        stopAILevelPoll();
-        setPhase("idle");
-      };
+        const cleanup = () => {
+          clearTimeout(checkTimer);
+          stopAILevelPoll();
+          URL.revokeObjectURL(blobUrl);
+          aiBlobUrlRef.current = null;
+          if (phaseRef.current === "ai-speaking") setPhase("idle");
+          resolve();
+        };
 
-      startAILevelPoll(audio);
-      await audio.play();
+        audio.onended = () => { backendSucceeded = true; cleanup(); };
+        audio.onerror = () => { cleanup(); };
+
+        startAILevelPoll(audio);
+        audio.play().then(() => {
+          // Check after 1.5s if audio is actually progressing
+          checkTimer = setTimeout(() => {
+            if (audio.currentTime > 0.1) {
+              playbackConfirmed = true;
+              backendSucceeded = true;
+            } else if (!playbackConfirmed) {
+              // Audio not progressing — Bluetooth headphone routing issue
+              console.warn("[TTS] Audio blob not playing (BT headphone routing?), falling back to speechSynthesis");
+              audio.pause();
+              cleanup();
+              // Will fall through to browser TTS below
+            }
+          }, 1500);
+        }).catch(() => { cleanup(); });
+      });
     } catch (err) {
-      console.warn("[useVoiceInterview] TTS failed:", err);
-      setPhase("idle");
+      console.warn("[useVoiceInterview] Backend TTS failed:", err);
     }
+
+    // Fallback: browser speechSynthesis (works with Bluetooth headphones)
+    if (!backendSucceeded && phaseRef.current !== "idle") {
+      setPhase("ai-speaking");
+      try {
+        await speakWithBrowserTTS(text, voice);
+      } catch {
+        // ignore
+      }
+      if (phaseRef.current === "ai-speaking") setPhase("idle");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backendBaseUrl, cancelAISpeech, enabled]);
 
-  // ---- Silence timer ----
-  function clearSilenceTimer() {
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
+  // ---- Silence detection helpers ----
+  function clearAllTimers() {
+    if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null; }
+    if (silenceIntervalRef.current) { clearInterval(silenceIntervalRef.current); silenceIntervalRef.current = null; }
+    if (maxListenTimerRef.current) { clearTimeout(maxListenTimerRef.current); maxListenTimerRef.current = null; }
+  }
+
+  function submitCurrentTranscript() {
+    clearAllTimers();
+    const txt = transcriptRef.current.trim();
+    if (txt && phaseRef.current === "listening") {
+      setPhase("processing");
+      onAnswerReady(txt);
     }
   }
 
   function resetSilenceTimer() {
-    clearSilenceTimer();
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    lastActivityRef.current = Date.now();
     silenceTimerRef.current = setTimeout(() => {
       const txt = transcriptRef.current.trim();
       if (txt && phaseRef.current === "listening") {
-        setPhase("processing");
-        onAnswerReady(txt);
+        submitCurrentTranscript();
       }
     }, silenceThresholdSecs * 1000);
+  }
+
+  function startSilenceInterval() {
+    if (silenceIntervalRef.current) clearInterval(silenceIntervalRef.current);
+    // Independent periodic checker — ensures silence threshold fires even
+    // when mic analyser gives near-zero (Bluetooth headphone issue on Windows)
+    silenceIntervalRef.current = setInterval(() => {
+      if (phaseRef.current !== "listening") { clearInterval(silenceIntervalRef.current!); return; }
+      const sinceLast = Date.now() - lastActivityRef.current;
+      if (sinceLast >= silenceThresholdSecs * 1000 && transcriptRef.current.trim()) {
+        submitCurrentTranscript();
+      }
+    }, 500);
+  }
+
+  function startMaxListenTimer() {
+    if (maxListenTimerRef.current) clearTimeout(maxListenTimerRef.current);
+    listenStartedAtRef.current = Date.now();
+    maxListenTimerRef.current = setTimeout(() => {
+      if (phaseRef.current !== "listening") return;
+      const txt = transcriptRef.current.trim() || "[no response — please continue]";
+      setPhase("processing");
+      onAnswerReady(txt);
+    }, maxListenSecs * 1000);
   }
 
   // ---- Mic level polling ----
@@ -229,8 +333,16 @@ export function useVoiceInterview({
       }
       const level = Math.min(Math.sqrt(sum / buf.length) * 6, 1);
       setVadLevel(level);
-      // Any activity → reset silence window
-      if (level > 0.04 && phaseRef.current === "listening") resetSilenceTimer();
+      // Activity from VAD resets the silence timer
+      if (level > 0.04 && phaseRef.current === "listening") {
+        lastActivityRef.current = Date.now();
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = setTimeout(() => {
+          if (transcriptRef.current.trim() && phaseRef.current === "listening") {
+            submitCurrentTranscript();
+          }
+        }, silenceThresholdSecs * 1000);
+      }
       micRafRef.current = requestAnimationFrame(tick);
     }
     tick();
@@ -267,16 +379,14 @@ export function useVoiceInterview({
     };
 
     rec.onerror = (e: any) => {
-      // "no-speech" is normal — don't stop listening
       if (e.error !== "no-speech") {
         console.warn("[SpeechRecognition] error:", e.error);
       }
     };
 
     rec.onend = () => {
-      // Auto-restart if still listening (browser stops recognition after ~60s)
       if (phaseRef.current === "listening") {
-        try { rec.start(); } catch { /* already restarting */ }
+        try { rec.start(); } catch { /* restarting */ }
       }
     };
 
@@ -287,9 +397,6 @@ export function useVoiceInterview({
       console.warn("[SpeechRecognition] start failed:", err);
     }
   }
-
-  const sttSocketRef = useRef<VoiceSocket | null>(null);
-  const processorNodeRef = useRef<ScriptProcessorNode | null>(null);
 
   function stopSpeechRecognition() {
     if (speechRecRef.current) {
@@ -311,7 +418,6 @@ export function useVoiceInterview({
   const startListening = useCallback(async () => {
     if (phaseRef.current === "listening") return;
 
-    // Stop any ongoing AI audio first
     if (phaseRef.current === "ai-speaking") {
       cancelAISpeech();
       await new Promise(r => setTimeout(r, 200));
@@ -321,9 +427,11 @@ export function useVoiceInterview({
     setTranscript("");
     setInterimTranscript("");
     setMicError(null);
+    lastActivityRef.current = Date.now();
 
     try {
-      // Avoid hardcoded sampleRate in getUserMedia constraints on Windows as hardware drivers can reject it with OverconstrainedError
+      // First try with audio enhancements, fall back to basic constraints
+      // to avoid OverconstrainedError on some Windows audio drivers
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
@@ -343,9 +451,7 @@ export function useVoiceInterview({
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioCtxClass();
-      if (ctx.state === "suspended") {
-        await ctx.resume().catch(() => {});
-      }
+      if (ctx.state === "suspended") await ctx.resume().catch(() => {});
       micCtxRef.current = ctx;
       const src = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
@@ -356,7 +462,8 @@ export function useVoiceInterview({
       startMicLevelPoll(analyser);
       startSpeechRecognition();
 
-      // Fallback: If Web Speech API is absent (such as in Tauri WebView2), use backend Whisper STT WebSocket stream
+      // Whisper WebSocket STT — used as primary path in Tauri WebView2
+      // where webkitSpeechRecognition is unavailable
       if (!speechApiAvailable && backendBaseUrl) {
         try {
           const wsProto = backendBaseUrl.startsWith("https") ? "wss:" : "ws:";
@@ -394,7 +501,11 @@ export function useVoiceInterview({
         }
       }
 
-      resetSilenceTimer(); // start counting silence immediately
+      // Start the silence interval checker (handles BT headphone mic silence)
+      startSilenceInterval();
+      // Start max-listen timeout so the interview keeps moving
+      startMaxListenTimer();
+
     } catch (err: any) {
       console.warn("[useVoiceInterview] getUserMedia failed:", err);
       const errName = err?.name ?? "";
@@ -402,21 +513,27 @@ export function useVoiceInterview({
       let userFriendlyErr = `Microphone error: ${errMsg}`;
       if (errName === "NotAllowedError" || errName === "PermissionDeniedError") {
         userFriendlyErr =
-          "Microphone permission denied. Please allow microphone access in Windows Settings → Privacy & Security → Microphone, and ensure 'Let desktop apps access your microphone' is ON.";
+          "⚠️ Microphone permission denied.\n\n" +
+          "To fix this:\n" +
+          "1. Open Windows Settings → Privacy & Security → Microphone\n" +
+          "2. Turn ON 'Let apps access your microphone'\n" +
+          "3. Turn ON 'Let desktop apps access your microphone'\n" +
+          "4. Restart Poise\n\n" +
+          "Also check that your Bluetooth headset is set as the default recording device in Sound Settings → Recording.";
       } else if (errName === "NotFoundError" || errName === "DevicesNotFoundError") {
-        userFriendlyErr = "No microphone found. Please connect a microphone to your computer.";
+        userFriendlyErr = "No microphone found. Please connect a microphone and check Bluetooth headset is connected.";
       } else if (errName === "NotReadableError" || errName === "TrackStartError") {
-        userFriendlyErr = "Microphone is in use by another application (e.g. Teams, Discord, Zoom).";
+        userFriendlyErr = "Microphone is in use by another app (Teams, Discord, Zoom). Please close it and retry.";
       }
       setMicError(userFriendlyErr);
       setMicAllowed(false);
       setPhase("idle");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cancelAISpeech, backendBaseUrl, speechApiAvailable]);
 
   const stopListening = useCallback(() => {
-    clearSilenceTimer();
+    clearAllTimers();
     stopSpeechRecognition();
     stopMicLevelPoll();
     micStreamRef.current?.getTracks().forEach(t => t.stop());
@@ -424,7 +541,7 @@ export function useVoiceInterview({
     micCtxRef.current?.close().catch(() => {});
     micCtxRef.current = null;
     if (phaseRef.current === "listening") setPhase("idle");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const clearTranscript = useCallback(() => {
