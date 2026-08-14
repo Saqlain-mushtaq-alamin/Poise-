@@ -23,6 +23,44 @@ pub fn run() {
         .setup(|app| {
             sidecar::spawn(app.handle())?;
             spawn_key_rehydration(app.handle().clone());
+
+            // Grant microphone + camera permissions in WebView2 on Windows.
+            // Without this the browser getUserMedia() call raises NotAllowedError
+            // even when the user has enabled mic access in Windows Privacy settings.
+            #[cfg(target_os = "windows")]
+            {
+                let main_window = app.get_webview_window("main");
+                if let Some(win) = main_window {
+                    win.with_webview(|wv| {
+                        #[cfg(windows)]
+                        {
+                            use webview2_com::Microsoft::Web::WebView2::Win32::{
+                                ICoreWebView2_13, COREWEBVIEW2_PERMISSION_KIND_MICROPHONE,
+                                COREWEBVIEW2_PERMISSION_KIND_CAMERA,
+                                COREWEBVIEW2_PERMISSION_STATE_ALLOW,
+                            };
+                            use windows::core::Interface;
+                            unsafe {
+                                if let Ok(wv2_13) = wv.controller().CoreWebView2().cast::<ICoreWebView2_13>() {
+                                    let _ = wv2_13.SetPermissionState(
+                                        COREWEBVIEW2_PERMISSION_KIND_MICROPHONE,
+                                        "",
+                                        COREWEBVIEW2_PERMISSION_STATE_ALLOW,
+                                        None,
+                                    );
+                                    let _ = wv2_13.SetPermissionState(
+                                        COREWEBVIEW2_PERMISSION_KIND_CAMERA,
+                                        "",
+                                        COREWEBVIEW2_PERMISSION_STATE_ALLOW,
+                                        None,
+                                    );
+                                }
+                            }
+                        }
+                    }).ok();
+                }
+            }
+
             Ok(())
         })
 
