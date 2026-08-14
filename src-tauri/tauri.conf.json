@@ -4,8 +4,8 @@
   "version": "1.0.0",
   "identifier": "com.poise.app",
   "build": {
-    "beforeDevCommand": "npm run dev --prefix frontend",
-    "beforeBuildCommand": "npm run build --prefix frontend",
+    "beforeDevCommand": "npm run dev --prefix ../frontend",
+    "beforeBuildCommand": "npm run build --prefix ../frontend",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../frontend/dist"
   },
