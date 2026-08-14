@@ -21,6 +21,7 @@ interface VideoCallInterviewRoomProps {
   onSubmitWarmUp: (text: string) => void;
   onSubmitAnswer: (text: string) => void;
   onEnd: () => void;
+  onBack: () => void;
   backendBaseUrl: string;
   personaName?: string;
   personaVoice?: string;
@@ -188,6 +189,7 @@ export function VideoCallInterviewRoom({
   onSubmitWarmUp,
   onSubmitAnswer,
   onEnd,
+  onBack,
   backendBaseUrl,
   personaName = "AI Interviewer",
   personaVoice = "en-US-AvaNeural",
@@ -329,6 +331,16 @@ export function VideoCallInterviewRoom({
             Check the <strong>Session Report</strong> for your detailed scoring breakdown.
           </p>
           <div className="vcir__complete-time">Session time: {formatTime(timerSecs)}</div>
+          <div className="vcir__complete-actions">
+            <button
+              id="vcir-back-btn"
+              className="vcir__complete-back-btn"
+              onClick={onBack}
+              type="button"
+            >
+              ← Back to Setup
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -377,10 +389,23 @@ export function VideoCallInterviewRoom({
 
       {/* ── Mic error banner ── */}
       {voice.micError && (
-        <div className="vcir__transcript-area" style={{ borderLeft: "4px solid var(--color-accent-danger)" }}>
-          <p className="vcir__transcript-hint" style={{ color: "var(--color-accent-danger)", fontWeight: "bold" }}>
-            ⚠️ {voice.micError}
-          </p>
+        <div className="vcir__mic-error-banner" role="alert">
+          <div className="vcir__mic-error-header">🎙️ Microphone issue detected</div>
+          <pre className="vcir__mic-error-body">{voice.micError}</pre>
+          <div className="vcir__mic-error-actions">
+            <button
+              className="vcir__mic-error-retry"
+              onClick={() => { voice.clearTranscript(); voice.startListening(); }}
+            >
+              🔄 Retry Microphone
+            </button>
+            <button
+              className="vcir__mic-error-text"
+              onClick={() => setShowManualInput(true)}
+            >
+              💬 Type Instead
+            </button>
+          </div>
         </div>
       )}
 
