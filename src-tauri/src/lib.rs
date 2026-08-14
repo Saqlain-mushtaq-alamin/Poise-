@@ -21,6 +21,9 @@ pub fn run() {
             keychain::list_configured_providers,
         ])
         .setup(|app| {
+            #[cfg(target_os = "windows")]
+            ensure_webview_mic_permissions();
+
             sidecar::spawn(app.handle())?;
             spawn_key_rehydration(app.handle().clone());
             Ok(())
@@ -59,4 +62,25 @@ fn spawn_key_rehydration(app: tauri::AppHandle) {
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
     });
+}
+
+/// Automatically fixes any blocked microphone permissions in WebView2's
+/// persistent Preferences file on Windows, preventing permanent NotAllowedError.
+#[cfg(target_os = "windows")]
+fn ensure_webview_mic_permissions() {
+    if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+        let pref_path = std::path::PathBuf::from(local_app_data)
+            .join("com.poise.app")
+            .join("EBWebView")
+            .join("Default")
+            .join("Preferences");
+        if pref_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&pref_path) {
+                if content.contains("\"media_stream_mic\"") && content.contains("\"setting\":2") {
+                    let updated = content.replace("\"setting\":2", "\"setting\":1");
+                    let _ = std::fs::write(&pref_path, updated);
+                }
+            }
+        }
+    }
 }
