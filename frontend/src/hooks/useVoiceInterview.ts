@@ -135,23 +135,42 @@ export function useVoiceInterview({
   // ---- Browser speechSynthesis TTS fallback ----
   function speakWithBrowserTTS(text: string, voiceName?: string): Promise<void> {
     return new Promise((resolve) => {
+      if (typeof window === "undefined" || !window.speechSynthesis) {
+        resolve();
+        return;
+      }
       window.speechSynthesis.cancel();
       const utt = new SpeechSynthesisUtterance(text);
       utt.rate = 0.95;
       utt.pitch = 1;
-      utt.volume = 1;
-      // Try to match a voice by name/lang
-      const voices = window.speechSynthesis.getVoices();
-      if (voiceName) {
-        const match = voices.find(v => v.name.toLowerCase().includes(voiceName.toLowerCase()) || v.lang.startsWith("en"));
-        if (match) utt.voice = match;
+      utt.volume = 1.0;
+
+      const assignVoiceAndSpeak = () => {
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+          let match: SpeechSynthesisVoice | undefined;
+          if (voiceName) {
+            match = voices.find(v => v.name.toLowerCase().includes(voiceName.toLowerCase()) || v.lang.startsWith("en"));
+          }
+          if (!match) {
+            match = voices.find(v => v.lang.startsWith("en")) || voices[0];
+          }
+          if (match) utt.voice = match;
+        }
+        utt.onend = () => resolve();
+        utt.onerror = () => resolve();
+        window.speechSynthesis.speak(utt);
+      };
+
+      if (window.speechSynthesis.getVoices().length === 0) {
+        window.speechSynthesis.onvoiceschanged = () => {
+          window.speechSynthesis.onvoiceschanged = null;
+          assignVoiceAndSpeak();
+        };
+        setTimeout(assignVoiceAndSpeak, 250);
       } else {
-        const eng = voices.find(v => v.lang.startsWith("en"));
-        if (eng) utt.voice = eng;
+        assignVoiceAndSpeak();
       }
-      utt.onend = () => resolve();
-      utt.onerror = () => resolve();
-      window.speechSynthesis.speak(utt);
     });
   }
 
