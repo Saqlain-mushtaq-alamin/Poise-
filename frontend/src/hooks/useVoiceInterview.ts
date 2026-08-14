@@ -112,39 +112,19 @@ export function useVoiceInterview({
   }, []);
 
   // ---- AI audio level (from HTMLAudioElement via AudioContext analyser) ----
-  function stopAILevelPoll() {
-    cancelAnimationFrame(aiLevelRafRef.current);
-    setAiAudioLevel(0);
-  }
-
-  async function startAILevelPoll(audio: HTMLAudioElement) {
-    try {
-      const AudioCtxClass =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const ctx = new AudioCtxClass();
-      if (ctx.state === "suspended") await ctx.resume().catch(() => {});
-      const src = ctx.createMediaElementSource(audio);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      src.connect(analyser);
-      analyser.connect(ctx.destination);
-      const buf = new Uint8Array(analyser.fftSize);
-      function tick() {
-        analyser.getByteTimeDomainData(buf);
-        let sum = 0;
-        for (let i = 0; i < buf.length; i++) {
-          const n = (buf[i] - 128) / 128;
-          sum += n * n;
-        }
-        setAiAudioLevel(Math.min(Math.sqrt(sum / buf.length) * 5, 1));
-        aiLevelRafRef.current = requestAnimationFrame(tick);
+  function startAILevelPoll(audio: HTMLAudioElement) {
+    stopAILevelPoll();
+    function tick() {
+      if (audio.paused || audio.ended) {
+        setAiAudioLevel(0);
+        return;
       }
-      tick();
-      audio.addEventListener("ended", () => ctx.close().catch(() => {}), { once: true });
-    } catch (err) {
-      console.warn("[useVoiceInterview] AI audio level poll setup failed:", err);
+      // Generate a natural speech audio level modulation while playing
+      const level = 0.25 + Math.sin(Date.now() / 80) * 0.15 + Math.random() * 0.1;
+      setAiAudioLevel(Math.min(Math.max(level, 0), 1));
+      aiLevelRafRef.current = requestAnimationFrame(tick);
     }
+    tick();
   }
 
   // ---- Browser speechSynthesis TTS fallback ----
