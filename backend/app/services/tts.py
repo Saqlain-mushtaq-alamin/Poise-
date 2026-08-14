@@ -167,22 +167,22 @@ class TTSEngine:
     async def synthesize_stream(
         self, text: str, voice: str = "default", chunk_samples: int = 4410
     ) -> AsyncGenerator[bytes, None]:
-        """Yields audio byte chunks. Uses Edge TTS if available (defaulting to en-US-AvaNeural),
-        falling back to placeholder tone whenever real synthesis isn't available."""
-        is_placeholder = voice == PLACEHOLDER_VOICE_ID or voice == "placeholder"
-        effective_voice = voice if (voice and voice.startswith("en-")) else "en-US-AvaNeural"
+        """Yields audio byte chunks. Uses Edge TTS if available and requested,
+        falling back to placeholder tone whenever real synthesis isn't available
+        or when default/placeholder voice is selected."""
+        is_edge_voice = voice and voice.startswith("en-")
 
-        if not is_placeholder and self._probe_edge_tts():
+        if is_edge_voice and self._probe_edge_tts():
             try:
-                async for chunk in self._synthesize_edge_tts(text, effective_voice):
+                async for chunk in self._synthesize_edge_tts(text, voice):
                     yield chunk
                 return
             except Exception:  # noqa: BLE001
                 logger.exception("Edge TTS synthesis failed; falling back to placeholder tone")
 
-        if not is_placeholder and self._backend_available():
+        if is_edge_voice and self._backend_available():
             try:
-                async for chunk in self._synthesize_with_real_backend(text, effective_voice, chunk_samples):
+                async for chunk in self._synthesize_with_real_backend(text, voice, chunk_samples):
                     yield chunk
                 return
             except Exception:  # noqa: BLE001
