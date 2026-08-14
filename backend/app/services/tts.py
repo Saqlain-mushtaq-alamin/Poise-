@@ -167,22 +167,21 @@ class TTSEngine:
     async def synthesize_stream(
         self, text: str, voice: str = "default", chunk_samples: int = 4410
     ) -> AsyncGenerator[bytes, None]:
-        """Yields audio byte chunks. Uses Edge TTS if available and requested,
-        falling back to placeholder tone whenever real synthesis isn't available
-        or when default/placeholder voice is selected."""
-        is_edge_voice = voice and voice.startswith("en-")
+        """Yields audio byte chunks. Uses Edge TTS if available (defaulting to en-US-AvaNeural),
+        falling back to placeholder tone whenever real synthesis isn't available."""
+        effective_voice = voice if (voice and voice.startswith("en-")) else "en-US-AvaNeural"
 
-        if is_edge_voice and self._probe_edge_tts():
+        if self._probe_edge_tts():
             try:
-                async for chunk in self._synthesize_edge_tts(text, voice):
+                async for chunk in self._synthesize_edge_tts(text, effective_voice):
                     yield chunk
                 return
             except Exception:  # noqa: BLE001
                 logger.exception("Edge TTS synthesis failed; falling back to placeholder tone")
 
-        if self._backend_available() and is_edge_voice:
+        if self._backend_available():
             try:
-                async for chunk in self._synthesize_with_real_backend(text, voice, chunk_samples):
+                async for chunk in self._synthesize_with_real_backend(text, effective_voice, chunk_samples):
                     yield chunk
                 return
             except Exception:  # noqa: BLE001
@@ -198,7 +197,7 @@ class TTSEngine:
 
         edge_voice = (
             voice
-            if voice and voice != "default" and voice != PLACEHOLDER_VOICE_ID
+            if voice and voice != "default" and voice != PLACEHOLDER_VOICE_ID and voice.startswith("en-")
             else "en-US-AvaNeural"
         )
         communicate = edge_tts.Communicate(text, edge_voice)
@@ -231,13 +230,13 @@ class TTSEngine:
         Use this for HTTP (non-streaming) responses. Use `synthesize_stream`
         for WebSocket streaming where chunks are played progressively.
         """
-        is_edge_voice = voice and voice.startswith("en-")
+        effective_voice = voice if (voice and voice.startswith("en-")) else "en-US-AvaNeural"
 
         # Edge TTS — concatenate raw audio bytes (MP3 format, not WAV)
-        if is_edge_voice and self._probe_edge_tts():
+        if self._probe_edge_tts():
             try:
                 chunks: list[bytes] = []
-                async for chunk in self._synthesize_edge_tts(text, voice):
+                async for chunk in self._synthesize_edge_tts(text, effective_voice):
                     chunks.append(chunk)
                 if chunks:
                     return b"".join(chunks)
