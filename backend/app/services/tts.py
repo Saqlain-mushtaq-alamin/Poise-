@@ -169,9 +169,10 @@ class TTSEngine:
     ) -> AsyncGenerator[bytes, None]:
         """Yields audio byte chunks. Uses Edge TTS if available (defaulting to en-US-AvaNeural),
         falling back to placeholder tone whenever real synthesis isn't available."""
+        is_placeholder = voice == PLACEHOLDER_VOICE_ID or voice == "placeholder"
         effective_voice = voice if (voice and voice.startswith("en-")) else "en-US-AvaNeural"
 
-        if self._probe_edge_tts():
+        if not is_placeholder and self._probe_edge_tts():
             try:
                 async for chunk in self._synthesize_edge_tts(text, effective_voice):
                     yield chunk
@@ -179,7 +180,7 @@ class TTSEngine:
             except Exception:  # noqa: BLE001
                 logger.exception("Edge TTS synthesis failed; falling back to placeholder tone")
 
-        if self._backend_available():
+        if not is_placeholder and self._backend_available():
             try:
                 async for chunk in self._synthesize_with_real_backend(text, effective_voice, chunk_samples):
                     yield chunk
@@ -230,10 +231,11 @@ class TTSEngine:
         Use this for HTTP (non-streaming) responses. Use `synthesize_stream`
         for WebSocket streaming where chunks are played progressively.
         """
+        is_placeholder = voice == PLACEHOLDER_VOICE_ID or voice == "placeholder"
         effective_voice = voice if (voice and voice.startswith("en-")) else "en-US-AvaNeural"
 
         # Edge TTS — concatenate raw audio bytes (MP3 format, not WAV)
-        if self._probe_edge_tts():
+        if not is_placeholder and self._probe_edge_tts():
             try:
                 chunks: list[bytes] = []
                 async for chunk in self._synthesize_edge_tts(text, effective_voice):
