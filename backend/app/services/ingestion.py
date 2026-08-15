@@ -44,13 +44,13 @@ class ContactInfo(BaseModel):
 
 
 class Skill(BaseModel):
-    name: str
+    name: str = "Unknown Skill"
     category: str | None = None
 
 
 class Experience(BaseModel):
-    company: str
-    title: str
+    company: str = "Unknown Company"
+    title: str = "Unknown Title"
     start_date: str | None = None
     end_date: str | None = None
     description: str | None = None
@@ -58,14 +58,14 @@ class Experience(BaseModel):
 
 
 class Education(BaseModel):
-    institution: str
+    institution: str = "Unknown Institution"
     degree: str | None = None
     field_of_study: str | None = None
     graduation_date: str | None = None
 
 
 class Project(BaseModel):
-    name: str
+    name: str = "Unknown Project"
     description: str | None = None
     technologies: list[str] = []
 
@@ -83,7 +83,7 @@ class ResumeData(BaseModel):
 
 
 class JobDescription(BaseModel):
-    title: str
+    title: str = "Job Position"
     company: str | None = None
     required_skills: list[str] = []
     preferred_skills: list[str] = []
