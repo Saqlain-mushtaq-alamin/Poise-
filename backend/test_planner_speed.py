@@ -18,7 +18,7 @@ async def main():
             
     from app.services.provider import ModelProviderRouter
     router = ModelProviderRouter()
-    router.model_plan = ModelPlan(llm=target_model, stt="", tts="", embedding="", vlm="")
+    router._model_plan = ModelPlan(llm=target_model, stt="", tts="", embedding="", vlm="")
     router.set_model_override(target_model)
     
     print(f"Testing with model: {target_model}")
