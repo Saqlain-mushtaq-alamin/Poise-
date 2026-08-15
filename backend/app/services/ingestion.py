@@ -16,6 +16,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
 
+from app.services.json_utils import extract_json_from_llm
 from app.services.provider import ModelProviderRouter, ModelRole
 
 SUPPORTED_RESUME_EXTENSIONS = {".pdf", ".docx", ".doc"}
@@ -174,7 +175,8 @@ class ResumeParser:
             )
 
         try:
-            data = ResumeData.model_validate_json(raw_response)
+            cleaned_response = extract_json_from_llm(raw_response)
+            data = ResumeData.model_validate_json(cleaned_response)
             data.full_text = text
             return data
         except (ValidationError, ValueError) as err:
@@ -214,7 +216,8 @@ class JDParser:
             )
 
         try:
-            return JobDescription.model_validate_json(raw_response)
+            cleaned_response = extract_json_from_llm(raw_response)
+            return JobDescription.model_validate_json(cleaned_response)
         except (ValidationError, ValueError) as err:
             raise StructuringError(
                 f"LLM response didn't match the expected job description schema: {err}"
