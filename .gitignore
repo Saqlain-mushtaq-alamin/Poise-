@@ -35,3 +35,6 @@ coverage/
 
 src-tauri/icons/
 planning 
+
+
+fallback_error.txt
