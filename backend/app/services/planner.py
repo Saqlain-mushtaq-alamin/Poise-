@@ -210,6 +210,8 @@ class InterviewPlanner:
                 messages=[{"role": "user", "content": prompt}],
                 model_role=ModelRole.REASONING,
                 stream=False,
+                response_format={"type": "json_object"},
+                max_tokens=2500,
             )
         except PlanGenerationError:
             raise
