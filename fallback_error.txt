@@ -5,10 +5,28 @@ Traceback (most recent call last):
   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
   File "pyimod02_importers.py", line 457, in exec_module
-  File "litellm\__init__.py", line 507, in <module>
-  File "litellm\litellm_core_utils\get_model_cost_map.py", line 302, in get_model_cost_map
-  File "litellm\litellm_core_utils\get_model_cost_map.py", line 62, in _get_backup_model_count
-  File "litellm\litellm_core_utils\get_model_cost_map.py", line 54, in load_local_model_cost_map
-  File "pathlib.py", line 1058, in read_text
-  File "pathlib.py", line 1044, in open
-FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\Admin\\AppData\\Local\\Temp\\_MEI235682\\litellm\\model_prices_and_context_window_backup.json'
+  File "litellm\__init__.py", line 1258, in <module>
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+  File "pyimod02_importers.py", line 457, in exec_module
+  File "litellm\compression\__init__.py", line 1, in <module>
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+  File "pyimod02_importers.py", line 457, in exec_module
+  File "litellm\compression\compress.py", line 16, in <module>
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+  File "pyimod02_importers.py", line 457, in exec_module
+  File "litellm\litellm_core_utils\token_counter.py", line 32, in <module>
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+  File "pyimod02_importers.py", line 457, in exec_module
+  File "litellm\litellm_core_utils\default_encoding.py", line 42, in <module>
+  File "tiktoken\registry.py", line 79, in get_encoding
+ValueError: Unknown encoding cl100k_base.
+Plugins found: []
+tiktoken version: 0.13.0 (are you on latest?)
