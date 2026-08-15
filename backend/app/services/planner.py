@@ -33,8 +33,8 @@ class InterviewConfig(BaseModel):
 
 
 class PlannedQuestion(BaseModel):
-    id: str
-    text: str
+    id: str = "q1"
+    text: str = ""
     follow_ups: list[str] = []
     evaluation_criteria: list[str] = []
     difficulty: str = "medium"
@@ -43,15 +43,15 @@ class PlannedQuestion(BaseModel):
 
 
 class InterviewSection(BaseModel):
-    type: str  # behavioral | technical | coding | situational
-    title: str
+    type: str = "general"  # behavioral | technical | coding | situational
+    title: str = "Interview Section"
     questions: list[PlannedQuestion] = []
-    time_budget_minutes: int
+    time_budget_minutes: int = 15
 
 
 class InterviewPlan(BaseModel):
-    sections: list[InterviewSection]
-    estimated_duration_minutes: int
+    sections: list[InterviewSection] = []
+    estimated_duration_minutes: int = 45
     coverage_matrix: dict[str, list[str]] = {}
 
 
