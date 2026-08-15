@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "app\services\planner.py", line 209, in generate_plan
+  File "app\services\provider.py", line 246, in chat
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+  File "pyimod02_importers.py", line 457, in exec_module
+  File "litellm\__init__.py", line 507, in <module>
+  File "litellm\litellm_core_utils\get_model_cost_map.py", line 302, in get_model_cost_map
+  File "litellm\litellm_core_utils\get_model_cost_map.py", line 62, in _get_backup_model_count
+  File "litellm\litellm_core_utils\get_model_cost_map.py", line 54, in load_local_model_cost_map
+  File "pathlib.py", line 1058, in read_text
+  File "pathlib.py", line 1044, in open
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\Admin\\AppData\\Local\\Temp\\_MEI235682\\litellm\\model_prices_and_context_window_backup.json'

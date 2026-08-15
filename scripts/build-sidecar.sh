@@ -18,6 +18,8 @@ cd backend
 pip install --quiet -r requirements.txt pyinstaller
 
 pyinstaller --noconfirm --onefile --name poise-backend \
+  --collect-data litellm \
+  --collect-data tiktoken \
   --distpath ../src-tauri/binaries \
   --workpath ./build \
   --specpath ./build \
