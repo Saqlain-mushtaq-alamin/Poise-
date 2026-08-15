@@ -92,6 +92,7 @@ class WarmUpConductor:
                 messages=[{"role": "user", "content": prompt}],
                 model_role=ModelRole.REASONING,
                 stream=False,
+                max_tokens=150,
             )
         except Exception:
             return f"Hello {resume.name or 'there'}! Welcome to your interview for the {jd.title} position. It's great to connect with you today."
@@ -112,6 +113,7 @@ class WarmUpConductor:
                 messages=[{"role": "user", "content": prompt}],
                 model_role=ModelRole.REASONING,
                 stream=False,
+                max_tokens=150,
             )
         except Exception:
             text = "Thank you for sharing that! Let's get started with our interview."
