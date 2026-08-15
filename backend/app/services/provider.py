@@ -247,6 +247,10 @@ class ModelProviderRouter:
 
         litellm_model = self._litellm_model_name(model)
 
+        if self._is_ollama_model(model):
+            if "num_ctx" not in kwargs:
+                kwargs["num_ctx"] = 8192
+
         if stream:
             return self._stream_chat(litellm_model, model, messages, **kwargs)
 
