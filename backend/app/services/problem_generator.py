@@ -16,6 +16,7 @@ import logging
 import random
 
 from app.schemas.coding import CodingProblem, Example, TestCase
+from app.services.json_utils import extract_json_from_llm
 
 logger = logging.getLogger("poise.problem_generator")
 
@@ -105,7 +106,7 @@ class ProblemGenerator:
         )
 
         text = _extract_text(response)
-        data = json.loads(_strip_code_fence(text))
+        data = json.loads(extract_json_from_llm(text))
         problem = CodingProblem.model_validate(data)
         _validate_problem(problem)
         return problem
@@ -135,14 +136,7 @@ def _extract_text(response) -> str:
     return str(response)
 
 
-def _strip_code_fence(text: str) -> str:
-    t = text.strip()
-    if t.startswith("```"):
-        t = t.split("```", 2)
-        t = t[1] if len(t) > 1 else t[0]
-        if t.startswith("json"):
-            t = t[4:]
-    return t.strip()
+
 
 
 # --------------------------------------------------------------------
