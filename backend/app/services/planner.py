@@ -216,6 +216,9 @@ class InterviewPlanner:
         except Exception as err:
             import logging
             logging.getLogger(__name__).warning("LLM plan generation failed (%s); generating fallback plan", err)
+            with open("D:\\canvas\\Poise-\\fallback_error.txt", "w") as f:
+                import traceback
+                f.write(traceback.format_exc())
             return self._generate_fallback_plan(resume, jd, config, section_budgets)
 
         try:
