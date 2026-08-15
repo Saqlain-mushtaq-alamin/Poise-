@@ -5,7 +5,7 @@ from app.services.planner import PLAN_GENERATION_PROMPT
 
 async def main():
     import app.models.settings
-    from app.services.hardware import ModelPlan
+    from app.services.tier import ModelPlan
     
     profile = detect_hardware()
     
