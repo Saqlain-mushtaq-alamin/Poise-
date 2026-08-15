@@ -160,6 +160,8 @@ class ResumeParser:
                 ],
                 model_role=ModelRole.REASONING,
                 stream=False,
+                response_format={"type": "json_object"},
+                max_tokens=1500,
             )
         except StructuringError:
             raise
@@ -198,6 +200,8 @@ class JDParser:
                 ],
                 model_role=ModelRole.REASONING,
                 stream=False,
+                response_format={"type": "json_object"},
+                max_tokens=1500,
             )
         except StructuringError:
             raise
