@@ -4,8 +4,24 @@ from app.services.hardware import detect_hardware
 from app.services.planner import PLAN_GENERATION_PROMPT
 
 async def main():
+    import app.models.settings
+    from app.services.hardware import ModelPlan
+    
     profile = detect_hardware()
+    
+    # Try to find the qwen model from available ollama models
+    target_model = "qwen:8b" # default fallback
+    for m in profile.ollama_models:
+        if "qwen" in m.lower():
+            target_model = m
+            break
+            
+    from app.services.provider import ModelProviderRouter
     router = ModelProviderRouter()
+    router.model_plan = ModelPlan(llm=target_model, stt="", tts="", embedding="", vlm="")
+    router.set_model_override(target_model)
+    
+    print(f"Testing with model: {target_model}")
     
     prompt = PLAN_GENERATION_PROMPT.format(
         section_budgets='{"behavioral": 15, "technical": 30}',
