@@ -14,6 +14,7 @@ import logging
 from pathlib import Path
 
 from app.schemas.coding import ScreenEvaluation
+from app.services.json_utils import extract_json_from_llm
 
 logger = logging.getLogger("poise.screen_evaluator")
 
@@ -72,7 +73,7 @@ class ScreenEvaluator:
         return self._parse(text)
 
     def _parse(self, text: str) -> ScreenEvaluation:
-        cleaned = _strip_code_fence(text)
+        cleaned = extract_json_from_llm(text)
         try:
             data = json.loads(cleaned)
             return ScreenEvaluation.model_validate(data)
@@ -120,11 +121,4 @@ def _extract_text(response) -> str:
     return str(response)
 
 
-def _strip_code_fence(text: str) -> str:
-    t = text.strip()
-    if t.startswith("```"):
-        t = t.split("```", 2)
-        t = t[1] if len(t) > 1 else t[0]
-        if t.startswith("json"):
-            t = t[4:]
-    return t.strip()
+
