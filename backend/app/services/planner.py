@@ -17,6 +17,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.services.company_formats import get_company_format
 from app.services.ingestion import JobDescription, ResumeData
+from app.services.json_utils import extract_json_from_llm
 from app.services.provider import ModelProviderRouter, ModelRole
 
 
@@ -218,7 +219,8 @@ class InterviewPlanner:
             return self._generate_fallback_plan(resume, jd, config, section_budgets)
 
         try:
-            payload = json.loads(raw_response)
+            cleaned_response = extract_json_from_llm(raw_response)
+            payload = json.loads(cleaned_response)
         except json.JSONDecodeError as err:
             raise PlanGenerationError(f"LLM response was not valid JSON: {err}") from err
 
