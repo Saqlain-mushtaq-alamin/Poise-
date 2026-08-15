@@ -202,13 +202,30 @@ class ModelProviderRouter:
 
         return model
 
+    def _is_ollama_model(self, model: str) -> bool:
+        if self._tier in (HardwareTier.LOCAL_FULL, HardwareTier.LOCAL_LITE):
+            return True
+        try:
+            import httpx
+            resp = httpx.get("http://localhost:11434/api/tags", timeout=1.0)
+            if resp.status_code == 200:
+                models = [m.get("name", "") for m in resp.json().get("models", []) if m.get("name")]
+                for m in models:
+                    if m == model or m.startswith(model + ":"):
+                        return True
+        except Exception:
+            pass
+        return False
+
     def _is_cloud_model(self, model: str) -> bool:
         # Ollama-served models are addressed as "ollama/<name>" once we hand
         # them to LiteLLM; anything else here is a cloud model needing a key.
-        return self._tier == HardwareTier.CLOUD_ASSIST
+        if self._is_ollama_model(model):
+            return False
+        return True
 
     def _litellm_model_name(self, model: str) -> str:
-        if self._tier in (HardwareTier.LOCAL_FULL, HardwareTier.LOCAL_LITE):
+        if self._is_ollama_model(model):
             return f"ollama/{model}"
         return model
 
