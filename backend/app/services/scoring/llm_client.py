@@ -14,6 +14,8 @@ import logging
 from enum import Enum
 from typing import Optional
 
+from app.services.json_utils import extract_json_from_llm
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,7 +62,8 @@ class ScoringLLMClient:
                 model=self.model, system=system, messages=[{"role": "user", "content": user}],
                 response_format="json", max_tokens=max_tokens,
             )
-            return json.loads(raw)
+            cleaned_response = extract_json_from_llm(raw)
+            return json.loads(cleaned_response)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Scoring LLM JSON call failed, falling back to heuristics: %s", exc)
             return None
