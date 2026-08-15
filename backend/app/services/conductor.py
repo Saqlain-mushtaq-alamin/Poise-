@@ -156,6 +156,8 @@ class InterviewConductor:
                 messages=[{"role": "user", "content": prompt}],
                 model_role=ModelRole.REASONING,
                 stream=False,
+                response_format={"type": "json_object"},
+                max_tokens=800,
             )
             cleaned_response = extract_json_from_llm(raw)
             payload = json.loads(cleaned_response)
