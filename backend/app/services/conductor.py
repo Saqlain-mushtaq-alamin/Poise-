@@ -17,6 +17,7 @@ import random
 from dataclasses import dataclass, field
 
 from app.services.framework import FrameworkAnalysis, FrameworkDetector
+from app.services.json_utils import extract_json_from_llm
 from app.services.personas import Persona
 from app.services.planner import PlannedQuestion
 from app.services.provider import ModelProviderRouter, ModelRole
@@ -156,7 +157,8 @@ class InterviewConductor:
                 model_role=ModelRole.REASONING,
                 stream=False,
             )
-            payload = json.loads(raw)
+            cleaned_response = extract_json_from_llm(raw)
+            payload = json.loads(cleaned_response)
             return _RawEvaluation(
                 score=float(payload["score"]),
                 feedback=payload["feedback"],
