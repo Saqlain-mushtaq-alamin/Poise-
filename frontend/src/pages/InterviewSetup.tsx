@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { VideoCallInterviewRoom } from "../components/interview/VideoCallInterviewRoom";
 import { useInterviewSession } from "../hooks/useInterviewSession";
@@ -185,8 +186,15 @@ export function InterviewSetup({ api }: InterviewSetupProps) {
         machineState={session.machineState}
         onSubmitWarmUp={session.respondToWarmUp}
         onSubmitAnswer={session.submitAnswer}
-        onEnd={session.endSession}
-        onBack={session.resetSession}
+        onEnd={() => {
+          const id = session.sessionId;
+          session.endSession();
+          if (id) navigate(`/report/${id}`);
+        }}
+        onBack={() => {
+          session.endSession();
+          session.resetSession();
+        }}
         backendBaseUrl={backendBaseUrl}
         personaName={selectedPersona.name}
         personaVoice={selectedPersona.voice ?? "en-US-AvaNeural"}
