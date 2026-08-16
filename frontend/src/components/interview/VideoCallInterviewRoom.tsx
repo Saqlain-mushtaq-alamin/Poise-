@@ -212,7 +212,14 @@ export function VideoCallInterviewRoom({
   const [lastPlayedMessage, setLastPlayedMessage] = useState<string | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [timerSecs, setTimerSecs] = useState(0);
+  const [showCoding, setShowCoding] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    const handler = () => setShowCoding(true);
+    window.addEventListener("poise:open-coding", handler);
+    return () => window.removeEventListener("poise:open-coding", handler);
+  }, []);
 
   // ── Answer submission — reads machineState via ref (no stale closure) ──
   const handleAnswerReady = useCallback(
@@ -542,6 +549,24 @@ export function VideoCallInterviewRoom({
           <span className="vcir__ctrl-label">End</span>
         </button>
       </div>
+
+      {/* ── Coding sandbox overlay ── */}
+      {showCoding && sessionId && (
+        <div className="vcir__coding-overlay" style={{ position: "absolute", inset: 0, zIndex: 100, backgroundColor: "var(--color-bg-primary)" }}>
+          <div style={{ padding: "var(--space-2) var(--space-4)", display: "flex", justifyContent: "flex-end", background: "var(--color-bg-elevated)", borderBottom: "1px solid var(--color-border)" }}>
+             <button className="vcir__ctrl-btn vcir__ctrl-btn--danger" onClick={() => setShowCoding(false)} style={{ padding: "var(--space-1) var(--space-3)", fontSize: "0.85rem" }}>
+                Close Sandbox
+             </button>
+          </div>
+          <div style={{ height: "calc(100% - 40px)" }}>
+            <CodingRound 
+              sessionId={sessionId} 
+              codingApi={new CodingAPI(sharedApi as any)} 
+              onComplete={() => setShowCoding(false)} 
+            />
+          </div>
+        </div>
+      )}
 
       {/* ── Processing overlay (lighter — doesn't block End) ── */}
       {busy && voice.phase === "processing" && (
