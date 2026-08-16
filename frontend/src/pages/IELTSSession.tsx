@@ -7,12 +7,13 @@ import { ScoreReveal } from "../components/ielts/ScoreReveal";
 import { useIELTSSession } from "../hooks/useIELTSSession";
 import { useVoiceInterview } from "../hooks/useVoiceInterview";
 import type { PoiseAPI } from "../lib/api";
+import "../styles/ielts.css"; // Modern UI styles
 
 const FADE = {
-  initial: { opacity: 0, y: 12 },
+  initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -12 },
-  transition: { duration: 0.25 },
+  exit: { opacity: 0, y: -20 },
+  transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] },
 };
 
 interface IELTSSessionProps {
@@ -92,45 +93,48 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
   };
 
   const renderAnswerArea = () => (
-    <div className="ielts-answer-area" style={{ marginTop: "1.5rem" }}>
+    <div className="ielts-answer-box">
       {voice.phase === "listening" ? (
-        <div className="vcir__transcript-area">
-          <div className="vcir__transcript-label" style={{ marginBottom: "0.5rem", fontSize: "0.9rem", color: "var(--color-text-muted)" }}>
-            <span className={`vcir__transcript-dot${voice.isSpeaking ? " vcir__transcript-dot--active" : ""}`} />
+        <div style={{ width: "100%", textAlign: "center" }}>
+          <div className="ielts-transcript-status" style={{ justifyContent: "center" }}>
+            <span className={`ielts-status-dot ${voice.isSpeaking ? "active" : ""}`} />
             {voice.isSpeaking ? "Speaking… (pause to submit)" : voice.transcript ? "Pause detected — will submit shortly" : "Listening for your answer…"}
           </div>
-          <div className="vcir__transcript-text" style={{ fontSize: "1.1rem", fontStyle: "italic", minHeight: "1.5rem" }}>
-            <span className="vcir__transcript-final">{voice.transcript}</span>
+          <div className="ielts-transcript-text">
+            <span>{voice.transcript}</span>
             {voice.interimTranscript && (
-              <span className="vcir__transcript-interim" style={{ opacity: 0.6 }}> {voice.interimTranscript}</span>
+              <span className="ielts-transcript-interim"> {voice.interimTranscript}</span>
             )}
           </div>
-          <button style={{ marginTop: "1rem", fontSize: "0.85rem", padding: "0.4rem 0.8rem", borderRadius: "16px" }} onClick={() => setShowManualInput(v => !v)}>
+          <button className="ielts-secondary-button" onClick={() => setShowManualInput(v => !v)}>
             {showManualInput ? "Hide keyboard" : "Type instead"}
           </button>
         </div>
       ) : (
-        <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
+        <div style={{ display: "flex", gap: "1rem" }}>
            {!isBusy && voice.phase !== "ai-speaking" && (
-             <button onClick={() => { voice.clearTranscript(); voice.startListening(); }}>Start Microphone</button>
+             <button className="ielts-action-button" style={{ marginTop: 0 }} onClick={() => { voice.clearTranscript(); voice.startListening(); }}>
+               Start Microphone
+             </button>
            )}
-           <button onClick={() => setShowManualInput(v => !v)}>{showManualInput ? "Hide keyboard" : "Type instead"}</button>
+           <button className="ielts-secondary-button" style={{ marginTop: 0 }} onClick={() => setShowManualInput(v => !v)}>
+             {showManualInput ? "Hide keyboard" : "Type instead"}
+           </button>
         </div>
       )}
 
       {showManualInput && (
-        <div style={{ marginTop: "1rem" }}>
+        <div style={{ width: "100%", marginTop: "1.5rem" }}>
           <textarea
+            className="ielts-manual-textarea"
             value={manualAnswer}
             onChange={e => setManualAnswer(e.target.value)}
-            style={{ width: "100%", padding: "0.75rem", borderRadius: "8px", border: "1px solid var(--color-border-subtle)", backgroundColor: "var(--color-bg-elevated)", color: "var(--color-text)", fontSize: "1rem" }}
-            rows={3}
             placeholder="Type your answer here..."
             onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleManualSend(); }}
           />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.5rem" }}>
-             <span style={{ fontSize: "0.8rem", color: "var(--color-text-muted)" }}>Ctrl+Enter to send</span>
-             <button onClick={handleManualSend} disabled={isBusy || !manualAnswer.trim()}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+             <span style={{ fontSize: "0.85rem", color: "var(--color-text-muted)" }}>Press Ctrl+Enter to send</span>
+             <button className="ielts-action-button" style={{ marginTop: 0, width: "auto", padding: "0.8rem 1.5rem" }} onClick={handleManualSend} disabled={isBusy || !manualAnswer.trim()}>
                Submit Answer
              </button>
           </div>
@@ -142,11 +146,12 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
   // ---- Not connected ----
   if (!api) {
     return (
-      <div className="ielts-page">
-        <h1>IELTS Speaking Practice</h1>
-        <div className="settings-card__warning" style={{ marginTop: "1.5rem", padding: "1.25rem 1.5rem", borderRadius: "12px" }}>
-          ⚠️ Sidecar not connected — please wait a moment while the backend initialises, then
-          refresh this page.
+      <div className="ielts-modern-layout">
+        <div className="ielts-glass-card">
+          <h1 className="ielts-title">IELTS Speaking Practice</h1>
+          <div className="settings-card__warning" style={{ marginTop: "1.5rem", padding: "1.25rem 1.5rem", borderRadius: "12px", width: "100%" }}>
+            ⚠️ Sidecar not connected — please wait a moment while the backend initialises, then refresh this page.
+          </div>
         </div>
       </div>
     );
@@ -155,10 +160,12 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
   // ---- Error state ----
   if (state.matches("error")) {
     return (
-      <div className="ielts-page">
-        <h2>Something went wrong</h2>
-        <p className="settings-card__warning" style={{ marginTop: "1rem" }}>{error}</p>
-        <button style={{ marginTop: "1.5rem" }} onClick={() => send({ type: "RETRY" })}>Try again</button>
+      <div className="ielts-modern-layout">
+        <div className="ielts-glass-card">
+          <h2 className="ielts-title">Something went wrong</h2>
+          <p className="ielts-subtitle" style={{ color: "var(--color-accent-danger)" }}>{error}</p>
+          <button className="ielts-action-button" onClick={() => send({ type: "RETRY" })}>Try again</button>
+        </div>
       </div>
     );
   }
@@ -166,30 +173,30 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
   // ---- Idle: setup screen ----
   if (state.matches("idle")) {
     return (
-      <div className="ielts-page">
-        <h1>IELTS Speaking Practice</h1>
-        <p>A full Part 1 / 2 / 3 simulation, scored against the four official criteria.</p>
-        <div className="settings-card" style={{ marginTop: "1.5rem", maxWidth: "420px" }}>
-          <h3>Session setup</h3>
-          <div className="audio-settings__row">
+      <div className="ielts-modern-layout">
+        <div className="ielts-glass-card">
+          <h1 className="ielts-title">IELTS Speaking Practice</h1>
+          <p className="ielts-subtitle">A full Part 1, 2, and 3 simulation, scored holistically against the four official criteria.</p>
+          
+          <div className="ielts-setup-row">
             <label htmlFor="target-band">Target band score</label>
             <input
               id="target-band"
+              className="ielts-setup-input"
               type="number"
               min={0}
               max={9}
               step={0.5}
               value={targetBand}
               onChange={(e) => setTargetBand(Number(e.target.value))}
-              style={{ width: "6rem" }}
             />
           </div>
           <button
-            style={{ marginTop: "1rem", width: "100%" }}
+            className="ielts-action-button"
             onClick={() => send({ type: "CREATE", targetBand })}
             disabled={isBusy}
           >
-            {isBusy ? "Creating session…" : "Create session"}
+            {isBusy ? "Creating session…" : "Create Session"}
           </button>
         </div>
       </div>
@@ -199,9 +206,11 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
   // ---- Creating ----
   if (state.matches("creating")) {
     return (
-      <div className="ielts-page">
-        <h1>IELTS Speaking Practice</h1>
-        <p style={{ opacity: 0.7, marginTop: "1rem" }}>Creating your session…</p>
+      <div className="ielts-modern-layout">
+        <div className="ielts-glass-card">
+          <h1 className="ielts-title">IELTS Speaking Practice</h1>
+          <p className="ielts-subtitle">Generating authentic topics and configuring your session...</p>
+        </div>
       </div>
     );
   }
@@ -209,16 +218,18 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
   // ---- Ready to start ----
   if (state.matches("readyToStart")) {
     return (
-      <div className="ielts-page">
-        <h1>Ready when you are</h1>
-        <p>The test takes about 11–14 minutes, just like the real IELTS Speaking test.</p>
-        <button
-          style={{ marginTop: "1.5rem" }}
-          onClick={() => send({ type: "BEGIN" })}
-          disabled={isBusy}
-        >
-          {isBusy ? "Starting…" : "Begin test"}
-        </button>
+      <div className="ielts-modern-layout">
+        <div className="ielts-glass-card">
+          <h1 className="ielts-title">Ready when you are</h1>
+          <p className="ielts-subtitle">The test takes about 11–14 minutes. Ensure your microphone is connected and you are in a quiet room.</p>
+          <button
+            className="ielts-action-button"
+            onClick={() => send({ type: "BEGIN" })}
+            disabled={isBusy}
+          >
+            {isBusy ? "Starting…" : "Begin Test"}
+          </button>
+        </div>
       </div>
     );
   }
@@ -226,7 +237,7 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
   // ---- Complete ----
   if (state.matches("complete") && score) {
     return (
-      <div className="ielts-page">
+      <div className="ielts-modern-layout">
         <ScoreReveal score={score} />
       </div>
     );
@@ -234,17 +245,19 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
 
   // ---- Active test ----
   return (
-    <div className="ielts-page">
-      <PartIndicator currentPart={prompt?.part} />
+    <div className="ielts-modern-layout">
+      <div style={{ position: "absolute", top: "2rem", left: "2rem" }}>
+        <PartIndicator currentPart={prompt?.part} />
+      </div>
 
       <AnimatePresence mode="wait">
         {state.matches("part1Intro") && (
-          <motion.div key="intro" {...FADE}>
-            <h2>Let's begin with some questions about yourself.</h2>
+          <motion.div className="ielts-glass-card" key="intro" {...FADE}>
+            <h2 className="ielts-question-text" style={{ fontSize: "2rem" }}>Let's begin with some questions about yourself.</h2>
             {voice.phase === "ai-speaking" ? (
-              <p style={{ color: "var(--color-text-muted)" }}>Listening to instructions...</p>
+              <p className="ielts-subtitle">Listening to examiner instructions...</p>
             ) : (
-              <button onClick={() => send({ type: "INTRO_FINISHED" })} disabled={isBusy}>
+              <button className="ielts-action-button" onClick={() => send({ type: "INTRO_FINISHED" })} disabled={isBusy}>
                 I'm ready
               </button>
             )}
@@ -252,57 +265,60 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
         )}
 
         {state.matches("part1QA") && prompt?.question && (
-          <motion.div key={prompt.question} {...FADE}>
-            <p className="ielts-question">{prompt.question}</p>
+          <motion.div className="ielts-glass-card" key={prompt.question} {...FADE}>
+            <p className="ielts-question-text">{prompt.question}</p>
             {renderAnswerArea()}
           </motion.div>
         )}
 
         {state.matches("part2CueCard") && prompt?.cue_card && (
-          <motion.div key="cue-card" {...FADE}>
+          <motion.div className="ielts-glass-card" key="cue-card" {...FADE}>
             <CueCard cueCard={prompt.cue_card} />
             {voice.phase === "ai-speaking" ? (
-              <p style={{ color: "var(--color-text-muted)", marginTop: "1rem" }}>Listening to instructions...</p>
+              <p className="ielts-subtitle" style={{ marginTop: "1.5rem" }}>Listening to examiner instructions...</p>
             ) : (
-              <button onClick={() => send({ type: "CUE_CARD_ACKNOWLEDGED" })} disabled={isBusy} style={{ marginTop: "1rem" }}>
-                Start preparation
+              <button className="ielts-action-button" onClick={() => send({ type: "CUE_CARD_ACKNOWLEDGED" })} disabled={isBusy}>
+                Start 1-minute preparation
               </button>
             )}
           </motion.div>
         )}
 
         {state.matches("part2Prep") && (
-          <motion.div key="prep" {...FADE} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
-            <PrepTimer label="Preparation" remainingSeconds={prepRemaining} totalSeconds={60} />
-            <p>Make some notes — you'll speak for up to 2 minutes.</p>
+          <motion.div className="ielts-glass-card" key="prep" {...FADE}>
+            <PrepTimer label="Preparation Time" remainingSeconds={prepRemaining} totalSeconds={60} />
+            <p className="ielts-subtitle" style={{ marginTop: "1rem" }}>Make some notes — you'll speak for up to 2 minutes.</p>
           </motion.div>
         )}
 
         {state.matches("part2Speaking") && (
-          <motion.div key="speaking" {...FADE} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
-            <PrepTimer label="Speaking" remainingSeconds={speakingRemaining} totalSeconds={120} warnAtRatio={0.15} />
-            <p className="ielts-question">{prompt?.cue_card?.topic}</p>
+          <motion.div className="ielts-glass-card" key="speaking" {...FADE}>
+            <div style={{ width: "100%", display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
+              <PrepTimer label="Speaking Time" remainingSeconds={speakingRemaining} totalSeconds={120} warnAtRatio={0.15} />
+            </div>
+            <p className="ielts-question-text" style={{ fontSize: "1.5rem" }}>{prompt?.cue_card?.topic}</p>
             {renderAnswerArea()}
           </motion.div>
         )}
 
         {state.matches("part2FollowUp") && (
-          <motion.div key="followup" {...FADE}>
-            <p className="ielts-question">{prompt?.question}</p>
+          <motion.div className="ielts-glass-card" key="followup" {...FADE}>
+            <p className="ielts-question-text">{prompt?.question}</p>
             {renderAnswerArea()}
           </motion.div>
         )}
 
         {state.matches("part3Discussion") && prompt?.question && (
-          <motion.div key={prompt.question} {...FADE}>
-            <p className="ielts-question">{prompt.question}</p>
+          <motion.div className="ielts-glass-card" key={prompt.question} {...FADE}>
+            <p className="ielts-question-text">{prompt.question}</p>
             {renderAnswerArea()}
           </motion.div>
         )}
 
         {(state.matches("scoring") || state.matches("fetchingScore")) && (
-          <motion.div key="scoring" {...FADE}>
-            <p>Calculating your band score…</p>
+          <motion.div className="ielts-glass-card" key="scoring" {...FADE}>
+            <h2 className="ielts-question-text">Calculating your band score…</h2>
+            <p className="ielts-subtitle">The examiner is evaluating your performance across all criteria.</p>
           </motion.div>
         )}
       </AnimatePresence>
