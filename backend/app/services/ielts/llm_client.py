@@ -100,3 +100,16 @@ class IELTSLLMClient:
                 '"example_from_response": "short direct quote (<15 words)"}'
             ),
         )
+
+    async def score_session_criterion(self, criterion: str, full_transcript: str) -> Optional[dict]:
+        """Holistic evaluation across the entire session transcript."""
+        return await self._complete_json(
+            system=SCORING_SYSTEM_PROMPT,
+            user=(
+                f"Criterion: {criterion}\n"
+                f"Evaluate the candidate holistically based on this entire IELTS speaking session transcript:\n\"\"\"\n{full_transcript}\n\"\"\"\n\n"
+                'Return JSON: {"band": <0-9 in 0.5 steps>, "justification": "...", '
+                '"strengths": ["..."], "areas_to_improve": ["..."], '
+                '"example_from_response": "short direct quote (<15 words)"}'
+            ),
+        )
