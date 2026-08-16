@@ -13,6 +13,7 @@ from app.models.session import Session
 from app.models.settings import AppSettings
 from app.models.scoring import SessionReportCache, DebriefMessage
 from app.models import motivation
+from app.models.coding import CodingProblem, CodingSubmission, CodingRound
 
 __all__ = [
     "Session",
