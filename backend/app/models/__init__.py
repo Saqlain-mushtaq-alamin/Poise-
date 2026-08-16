@@ -12,6 +12,7 @@ from app.models.interview import (
 from app.models.session import Session
 from app.models.settings import AppSettings
 from app.models.scoring import SessionReportCache, DebriefMessage
+from app.models import motivation
 
 __all__ = [
     "Session",
