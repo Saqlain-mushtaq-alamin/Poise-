@@ -264,10 +264,7 @@ class IELTSSessionConductor:
             .filter(IELTSAnswer.ielts_session_id == row.id)
             .all()
         )
-        per_answer_scores = [
-            IELTSBandScore.from_dict(a.band_score) for a in answers if a.band_score
-        ]
-        session_score = await self.evaluator.score_session(per_answer_scores)
+        session_score = await self.evaluator.score_session(answers)
 
         row.overall_band_score = asdict(session_score)
         if machine.state == IELTSState.SCORING:
