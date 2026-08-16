@@ -74,6 +74,7 @@ const DEFAULT_COMPANY_FORMATS: CompanyFormat[] = [
 
 export function InterviewSetup({ api }: InterviewSetupProps) {
   const session = useInterviewSession(api);
+  const navigate = useNavigate();
 
   const [personas, setPersonas] = useState<Persona[]>(DEFAULT_PERSONAS);
   const [companyFormats, setCompanyFormats] = useState<CompanyFormat[]>(DEFAULT_COMPANY_FORMATS);
