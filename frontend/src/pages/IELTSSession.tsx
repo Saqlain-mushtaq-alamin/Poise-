@@ -22,8 +22,9 @@ interface IELTSSessionProps {
 }
 
 export default function IELTSSession({ api }: IELTSSessionProps) {
+  const navigate = useNavigate();
   const {
-    state, send, prompt, score, error,
+    state, send, prompt, score, error, sessionId,
     isPrep: _isPrep, isSpeaking: _isSpeaking, prepRemaining, speakingRemaining, isBusy,
   } = useIELTSSession(api);
 
