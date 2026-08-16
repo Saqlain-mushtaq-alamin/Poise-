@@ -84,7 +84,7 @@ export function Shell({ children, sidecarStatus, api }: ShellProps) {
           )}
         </div>
 
-        <StatusBar sidecarStatus={sidecarStatus} />
+        <StatusBar sidecarStatus={sidecarStatus} api={api} />
       </div>
     </div>
   );
