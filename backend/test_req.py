@@ -3,7 +3,7 @@ import urllib.error
 import json
 
 req = urllib.request.Request(
-    'http://127.0.0.1:8000/ielts/sessions',
+    'http://127.0.0.1:8001/ielts/sessions',
     method='POST',
     headers={'Content-Type': 'application/json'},
     data=json.dumps({'target_band': 6.5}).encode('utf-8')
