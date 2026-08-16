@@ -11,6 +11,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useVoiceInterview } from "../../hooks/useVoiceInterview";
+import { CodingRound } from "../../pages/CodingRound";
+import { CodingAPI } from "../../lib/codingApi";
+import { api as sharedApi } from "../../lib/api";
 
 interface VideoCallInterviewRoomProps {
   currentMessage: string | null;
