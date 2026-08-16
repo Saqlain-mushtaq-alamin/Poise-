@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { CueCard } from "../components/ielts/CueCard";
 import { PartIndicator } from "../components/ielts/PartIndicator";
 import { PrepTimer } from "../components/ielts/PrepTimer";
@@ -239,6 +240,17 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
     return (
       <div className="ielts-modern-layout">
         <ScoreReveal score={score} />
+        <button
+          className="ielts-action-button"
+          style={{ marginTop: "2rem" }}
+          onClick={() => {
+            if (sessionId) {
+              navigate(`/report/${sessionId}`);
+            }
+          }}
+        >
+          View Detailed Report
+        </button>
       </div>
     );
   }
