@@ -11,6 +11,7 @@ from app.models.interview import (
 )
 from app.models.session import Session
 from app.models.settings import AppSettings
+from app.models.scoring import SessionReportCache, DebriefMessage
 
 __all__ = [
     "Session",
@@ -22,4 +23,6 @@ __all__ = [
     "ConfidenceFrameRecord",
     "IELTSSession",
     "IELTSAnswer",
+    "SessionReportCache",
+    "DebriefMessage",
 ]
