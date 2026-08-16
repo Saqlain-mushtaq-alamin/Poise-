@@ -261,14 +261,28 @@ class IELTSBandEvaluator:
         )
 
     async def score_session(
-        self, per_answer_scores: list[IELTSBandScore]
+        self, answers: list
     ) -> IELTSBandScore:
-        """Aggregate several per-answer scores into one session-level score."""
-        if not per_answer_scores:
+        """Aggregate session score using holistic evaluation for Lexical Resource and Grammar."""
+        if not answers:
             raise ValueError("Cannot score a session with no answers")
+
+        # Build full transcript for holistic scoring
+        transcript_lines = []
+        for a in answers:
+            transcript_lines.append(f"Examiner (Part {a.part}): {a.question_text}")
+            transcript_lines.append(f"Candidate: {a.transcript}\n")
+        full_transcript = "\n".join(transcript_lines)
+
+        # Extract per-answer scores for aggregation
+        per_answer_scores = [
+            IELTSBandScore.from_dict(a.band_score) for a in answers if a.band_score
+        ]
 
         def agg(field_name: str) -> BandDetail:
             details = [getattr(s, field_name) for s in per_answer_scores]
+            if not details:
+                return BandDetail(band=5.0, justification="No data")
             avg_band = _round_to_half(mean(d.band for d in details))
             strengths = sorted({s for d in details for s in d.strengths})[:5]
             improve = sorted({a for d in details for a in d.areas_to_improve})[:5]
@@ -281,10 +295,17 @@ class IELTSBandEvaluator:
                 example_from_response=example,
             )
 
+        # Fluency & Coherence and Pronunciation are algorithmically derived, so average them
         fc = agg("fluency_and_coherence")
-        lr = agg("lexical_resource")
-        gra = agg("grammatical_range_accuracy")
         p = agg("pronunciation")
+
+        # Lexical Resource and Grammar are scored holistically across the entire session transcript
+        lr_result = await self.llm_client.score_session_criterion("Lexical Resource", full_transcript)
+        gra_result = await self.llm_client.score_session_criterion("Grammatical Range & Accuracy", full_transcript)
+
+        lr = BandDetail(**lr_result) if lr_result else agg("lexical_resource")
+        gra = BandDetail(**gra_result) if gra_result else agg("grammatical_range_accuracy")
+
         overall = _round_to_half(mean([fc.band, lr.band, gra.band, p.band]))
 
         return IELTSBandScore(
