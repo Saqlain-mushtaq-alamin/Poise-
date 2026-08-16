@@ -18,7 +18,7 @@ import "../components/motivation/motivation.css";
  * signal around them, per the 10.8 wireframe.
  */
 export function Dashboard({
-  userName = "there",
+  userName = "",
   onStartInterview,
   onStartIelts,
 }: {
@@ -46,7 +46,7 @@ export function Dashboard({
         animate={{ opacity: 1, y: 0 }}
         style={{ fontSize: 24, fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}
       >
-        {greeting}, {userName}!
+        {greeting}{userName ? `, ${userName}` : ""}!
       </motion.h1>
 
       <div
