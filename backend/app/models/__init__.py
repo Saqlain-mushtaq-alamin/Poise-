@@ -2,6 +2,7 @@
 Base.metadata.create_all can discover all tables."""
 
 from app.models.confidence import ConfidenceFrameRecord
+from app.models.ielts import IELTSAnswer, IELTSSession
 from app.models.interview import (
     InterviewSessionDetail,
     JobDescriptionRecord,
@@ -19,4 +20,6 @@ __all__ = [
     "InterviewSessionDetail",
     "QuestionTurn",
     "ConfidenceFrameRecord",
+    "IELTSSession",
+    "IELTSAnswer",
 ]
