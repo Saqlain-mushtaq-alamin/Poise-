@@ -105,16 +105,16 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
               <span className="vcir__transcript-interim" style={{ opacity: 0.6 }}> {voice.interimTranscript}</span>
             )}
           </div>
-          <button className="btn-secondary" style={{ marginTop: "1rem", fontSize: "0.85rem", padding: "0.4rem 0.8rem", borderRadius: "16px" }} onClick={() => setShowManualInput(v => !v)}>
+          <button style={{ marginTop: "1rem", fontSize: "0.85rem", padding: "0.4rem 0.8rem", borderRadius: "16px" }} onClick={() => setShowManualInput(v => !v)}>
             {showManualInput ? "Hide keyboard" : "Type instead"}
           </button>
         </div>
       ) : (
         <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
            {!isBusy && voice.phase !== "ai-speaking" && (
-             <button className="btn-primary" onClick={() => { voice.clearTranscript(); voice.startListening(); }}>Start Microphone</button>
+             <button onClick={() => { voice.clearTranscript(); voice.startListening(); }}>Start Microphone</button>
            )}
-           <button className="btn-secondary" onClick={() => setShowManualInput(v => !v)}>{showManualInput ? "Hide keyboard" : "Type instead"}</button>
+           <button onClick={() => setShowManualInput(v => !v)}>{showManualInput ? "Hide keyboard" : "Type instead"}</button>
         </div>
       )}
 
