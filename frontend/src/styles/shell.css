@@ -789,6 +789,7 @@
   flex-direction: column;
   gap: var(--space-4);
   transition: box-shadow var(--transition-fast);
+  min-width: 0;
 }
 
 .is-card:hover {
@@ -928,7 +929,7 @@
 /* Persona grid */
 .is-persona-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
   gap: var(--space-2);
 }
 
