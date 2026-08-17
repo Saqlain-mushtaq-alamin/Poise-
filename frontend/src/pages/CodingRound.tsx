@@ -156,7 +156,12 @@ export function CodingRound({
   }
 
   if (!problem) {
-    return <div className="poise-coding-round__loading">Generating your coding problem…</div>;
+    return (
+      <div className="poise-coding-round__loading">
+        <span className="poise-spinner" style={{ width: 28, height: 28, borderWidth: 3 }} />
+        Generating your coding problem…
+      </div>
+    );
   }
 
   return (
