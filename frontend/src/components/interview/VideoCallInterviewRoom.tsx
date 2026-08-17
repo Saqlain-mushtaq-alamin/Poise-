@@ -554,18 +554,21 @@ export function VideoCallInterviewRoom({
       </div>
 
       {/* ── Coding sandbox overlay ── */}
-      {showCoding && sessionId && (
-        <div className="vcir__coding-overlay" style={{ position: "absolute", inset: 0, zIndex: 100, backgroundColor: "var(--color-bg-primary)" }}>
-          <div style={{ padding: "var(--space-2) var(--space-4)", display: "flex", justifyContent: "flex-end", background: "var(--color-bg-elevated)", borderBottom: "1px solid var(--color-border)" }}>
-             <button className="vcir__ctrl-btn vcir__ctrl-btn--danger" onClick={() => setShowCoding(false)} style={{ padding: "var(--space-1) var(--space-3)", fontSize: "0.85rem" }}>
-                Close Sandbox
-             </button>
+      {showCoding && (
+        <div className="vcir__coding-overlay" style={{ position: "absolute", inset: 0, zIndex: 100, display: "flex", flexDirection: "column", backgroundColor: "var(--color-bg-primary, #0f1117)" }}>
+          <div style={{ padding: "var(--space-2, 8px) var(--space-4, 16px)", display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--color-bg-elevated, #1a1d27)", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+            <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--color-text-primary, #fff)", display: "flex", alignItems: "center", gap: "8px" }}>
+              💻 <span>Coding Sandbox</span>
+            </span>
+            <button className="vcir__ctrl-btn vcir__ctrl-btn--danger" onClick={() => setShowCoding(false)} style={{ padding: "6px 16px", fontSize: "0.85rem", minWidth: "unset" }}>
+              ✕ Close
+            </button>
           </div>
-          <div style={{ height: "calc(100% - 40px)" }}>
-            <CodingRound 
-              sessionId={sessionId} 
-              codingApi={new CodingAPI(sharedApi as any)} 
-              onComplete={() => setShowCoding(false)} 
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <CodingRound
+              sessionId={sessionId ?? "demo-session"}
+              codingApi={new CodingAPI(sharedApi as any)}
+              onComplete={() => setShowCoding(false)}
             />
           </div>
         </div>
