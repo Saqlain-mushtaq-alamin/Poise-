@@ -19,6 +19,7 @@ import { OutputPanel } from '../components/coding/OutputPanel';
 import { ProblemPanel } from '../components/coding/ProblemPanel';
 import { ScreenCaptureButton } from '../components/coding/ScreenCapture';
 import { CodingAPI } from '../lib/codingApi';
+import '../components/coding/coding.css';
 import type {
   CodeEvaluation,
   ExecutionResult,
@@ -58,12 +59,23 @@ export function CodingRound({
     let cancelled = false;
     (async () => {
       try {
+        // Try the full session-based round start first
         const res = await codingApi.startCodingRound(sessionId, { difficulty, topics });
         if (cancelled) return;
         setRoundId(res.round_id);
         setProblem(res.problem);
-      } catch (e) {
-        if (!cancelled) setError('Could not load a coding problem. Please retry.');
+      } catch {
+        // Backend coding-round endpoint not available — fall back to standalone
+        // problem generation so the sandbox still works mid-interview.
+        try {
+          const fallbackProblem = await codingApi.generateProblem({ difficulty, topics });
+          if (cancelled) return;
+          // Use a local round id so submit/finalize is a no-op
+          setRoundId(`local-${Date.now()}`);
+          setProblem(fallbackProblem);
+        } catch (e2) {
+          if (!cancelled) setError('Could not load a coding problem. Please retry.');
+        }
       }
     })();
     return () => {
@@ -112,13 +124,20 @@ export function CodingRound({
     if (!roundId) return;
     setIsFinalizing(true);
     try {
+      // Local fallback rounds (no real backend round) — just close the sandbox
+      if (roundId.startsWith('local-')) {
+        onComplete?.(null as unknown as CodeEvaluation);
+        window.dispatchEvent(new CustomEvent(CODING_ROUND_COMPLETE_EVENT, { detail: null }));
+        return;
+      }
       const result = await codingApi.completeCodingRound(sessionId, roundId);
       onComplete?.(result.final_evaluation);
       window.dispatchEvent(
         new CustomEvent(CODING_ROUND_COMPLETE_EVENT, { detail: result })
       );
-    } catch (e) {
-      setError('Could not finalize the coding round.');
+    } catch {
+      // Finalize failed — close the sandbox gracefully anyway
+      onComplete?.(null as unknown as CodeEvaluation);
     } finally {
       setIsFinalizing(false);
     }
