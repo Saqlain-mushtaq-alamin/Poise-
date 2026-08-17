@@ -197,6 +197,7 @@ export function VideoCallInterviewRoom({
   personaName = "AI Interviewer",
   personaVoice = "en-US-AvaNeural",
   enableCoding = false,
+  sessionId,
 }: VideoCallInterviewRoomProps) {
   const isWarmUp = isWarmUpState(machineState);
   const canUserAnswer = isListeningPhase(machineState);
