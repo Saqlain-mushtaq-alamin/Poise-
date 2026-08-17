@@ -60,9 +60,9 @@ router = APIRouter(prefix="/coding", tags=["coding"])
 
 
 def get_provider():
-    from app.services.provider import get_model_provider  # noqa: PLC0415
+    from app.services.provider import get_router  # noqa: PLC0415
 
-    return get_model_provider()
+    return get_router()
 
 
 def get_sandbox() -> CodeSandbox:
