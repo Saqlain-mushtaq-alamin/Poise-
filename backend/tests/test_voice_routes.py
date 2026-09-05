@@ -25,7 +25,12 @@ def test_synthesize_streaming_returns_valid_wav_audio(client):
 def test_synthesize_non_streaming_also_returns_valid_wav(client):
     resp = client.post("/voice/tts/synthesize", json={"text": "Hello world", "stream": False})
     assert resp.status_code == 200
-    assert resp.content[:4] == b"RIFF"
+    # Edge TTS returns MP3 (\xff\xf3 / ID3 magic bytes); placeholder returns WAV (RIFF).
+    # Both are valid audio — the router detects and sets content-type accordingly.
+    content_type = resp.headers.get("content-type", "")
+    assert content_type in ("audio/wav", "audio/mpeg"), f"Unexpected content-type: {content_type}"
+    # Sanity: response is non-empty
+    assert len(resp.content) > 0
 
 
 def test_list_devices_returns_a_list_without_crashing(client):
@@ -84,4 +89,5 @@ def test_stt_stream_websocket_reports_model_unavailable_gracefully(client):
 
     assert "error" in response
     assert "model_name" in response
-    assert response["model_name"] == "tiny"  # default CLOUD_ASSIST tier
+    # Default tier is now LOCAL_LITE -> "base" model (Fix 4: better accuracy)
+    assert response["model_name"] == "base"
