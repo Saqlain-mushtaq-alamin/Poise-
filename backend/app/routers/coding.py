@@ -400,7 +400,7 @@ async def complete_coding_round(
         round_row.best_submission_id = best_submission.id
 
     round_row.status = "completed"
-    round_row.completed_at = datetime.utcnow()
+    round_row.completed_at = datetime.now(timezone.utc)
     round_row.final_evaluation = evaluation.model_dump()
     db.commit()
 
@@ -435,16 +435,13 @@ def _problem_row_to_schema(row: CodingProblemModel) -> CodingProblem:
 
 
 def _load_jd(db: DBSession, jd_id: str):
-    """Best-effort load of Phase 4's JobDescription row/model.
-    Adjust the import/query to match Phase 4's actual persistence layer
-    once merged — this is intentionally decoupled so Phase 6 can be
-    developed and tested before Phase 4 lands."""
+    """Load a JobDescriptionRecord by primary key."""
     try:
-        from app.models.interview import JobDescription as JDModel  # noqa: PLC0415
+        from app.models.interview import JobDescriptionRecord as JDModel  # noqa: PLC0415
 
         return db.get(JDModel, jd_id)
     except ImportError:
-        logger.warning("Phase 4 JobDescription model not available yet; skipping JD context")
+        logger.warning("Interview JobDescriptionRecord model not available; skipping JD context")
         return None
 
 
@@ -454,21 +451,26 @@ def _load_resume(db: DBSession, resume_id: str):
 
         return db.get(ResumeModel, resume_id)
     except ImportError:
-        logger.warning("Phase 4 Resume model not available yet; skipping resume context")
+        logger.warning("Interview Resume model not available; skipping resume context")
         return None
 
 
 def _load_session_context(db: DBSession, session_id: str):
-    """Pull JD + resume associated with an interview session, if Phase 4's
-    session model is present. Returns (jd, resume), either may be None."""
+    """Pull JD + resume associated with an interview session.
+    Returns (jd, resume), either may be None."""
     try:
-        from app.models.interview import Session as SessionModel  # noqa: PLC0415
+        from app.models.interview import InterviewSessionDetail  # noqa: PLC0415
+        from app.models.interview import JobDescriptionRecord, Resume  # noqa: PLC0415
 
-        session = db.get(SessionModel, session_id)
-        if session is None:
+        detail = (
+            db.query(InterviewSessionDetail)
+            .filter(InterviewSessionDetail.session_id == session_id)
+            .one_or_none()
+        )
+        if detail is None:
             return None, None
-        jd = getattr(session, "job_description", None)
-        resume = getattr(session, "resume", None)
+        jd = db.get(JobDescriptionRecord, detail.jd_id) if detail.jd_id else None
+        resume = db.get(Resume, detail.resume_id) if detail.resume_id else None
         return jd, resume
-    except ImportError:
+    except (ImportError, AttributeError):
         return None, None

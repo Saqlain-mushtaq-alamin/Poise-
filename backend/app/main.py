@@ -68,6 +68,7 @@ def create_app() -> FastAPI:
     app.include_router(interview.router)
     app.include_router(ielts.router)
     app.include_router(coding.router)
+    app.include_router(coding.interview_handoff_router)
     app.include_router(motivation.router)
     app.include_router(scoring.router)
     app.include_router(voice.router)
