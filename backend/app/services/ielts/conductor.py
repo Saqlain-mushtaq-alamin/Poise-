@@ -10,8 +10,10 @@ will recognize the pattern immediately.
 
 from __future__ import annotations
 
+import logging
+import random
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
@@ -25,6 +27,8 @@ from app.services.ielts.prosody import ProsodyAnalyzer
 from app.services.ielts.scorer import IELTSBandEvaluator, IELTSBandScore
 from app.services.ielts.state_machine import IELTSState, IELTSStateMachine
 from app.services.ielts.topics import IELTSTopicGenerator
+
+logger = logging.getLogger("poise.ielts.conductor")
 
 
 class IELTSSessionNotFound(Exception):
@@ -42,7 +46,15 @@ class IELTSSessionConductor:
         llm_client: IELTSLLMClient | None = None,
     ):
         self.db = db
-        self.llm_client = llm_client or IELTSLLMClient()
+        # Wire the real LLM router so dynamic follow-ups and LLM scoring work.
+        if llm_client is None:
+            try:
+                from app.services.provider import get_router  # noqa: PLC0415
+                router = get_router()
+                llm_client = IELTSLLMClient(router=router)
+            except Exception:
+                llm_client = IELTSLLMClient()  # graceful offline fallback
+        self.llm_client = llm_client
         self.topic_generator = topic_generator or IELTSTopicGenerator(self.llm_client)
         self.evaluator = evaluator or IELTSBandEvaluator(self.llm_client)
         self.pronunciation_analyzer = pronunciation_analyzer or PronunciationAnalyzer()
@@ -73,8 +85,13 @@ class IELTSSessionConductor:
         parent = ParentSession(id=str(uuid4()), mode="ielts", status="created")
         self.db.add(parent)
 
+        # Collect previously used categories to avoid repetition across sessions.
+        exclude_categories = self._get_used_categories(limit=5)
+
         topic_set = await self.topic_generator.generate_session_topics(
-            target_band=target_band, topics_preference=topics_preference
+            target_band=target_band,
+            topics_preference=topics_preference,
+            exclude_categories=exclude_categories,
         )
 
         row = IELTSSession(
@@ -91,6 +108,26 @@ class IELTSSessionConductor:
         self.db.commit()
         self.db.refresh(row)
         return row
+
+    def _get_used_categories(self, limit: int = 5) -> list[str]:
+        """Return Part 1 category names used in recent sessions to avoid repetition."""
+        try:
+            recent = (
+                self.db.query(IELTSSession)
+                .filter(IELTSSession.part1_categories.isnot(None))
+                .order_by(IELTSSession.created_at.desc())
+                .limit(limit)
+                .all()
+            )
+            seen: list[str] = []
+            for row in recent:
+                for cat in (row.part1_categories or []):
+                    name = cat.get("category", "")
+                    if name and name not in seen:
+                        seen.append(name)
+            return seen
+        except Exception:
+            return []
 
     # -- flow control ------------------------------------------------------
 
@@ -162,6 +199,10 @@ class IELTSSessionConductor:
         )
         self.db.add(answer)
 
+        # Store Part 2 transcript for contextual follow-up generation
+        if machine.state == IELTSState.PART2_SPEAKING:
+            row.part2_answer_transcript = transcript
+
         next_prompt = await self._advance_after_answer(row, machine, transcript)
         self.db.commit()
         return answer, next_prompt
@@ -184,6 +225,11 @@ class IELTSSessionConductor:
         elif machine.state == IELTSState.PART2_SPEAKING:
             transition = machine.advance()  # -> PART2_FOLLOW_UP
             row.status = transition.to_state.value
+            # Generate contextual follow-up from Part 2 answer
+            theme = (row.part2_cue_card or {}).get("theme", "")
+            followup = await self._generate_followup(last_answer, part=2, theme=theme)
+            if followup:
+                row.dynamic_followup = followup
 
         elif machine.state == IELTSState.PART2_FOLLOW_UP:
             transition = machine.advance()  # -> PART3_DISCUSSION
@@ -193,11 +239,27 @@ class IELTSSessionConductor:
             questions = row.part3_questions or []
             if row.part3_index + 1 < len(questions):
                 row.part3_index += 1
+                # Occasionally insert a contextual follow-up (~40% chance)
+                if random.random() < 0.4:
+                    theme = (row.part2_cue_card or {}).get("theme", "")
+                    followup = await self._generate_followup(last_answer, part=3, theme=theme)
+                    if followup:
+                        row.dynamic_followup = followup
             else:
                 transition = machine.advance()  # -> SCORING
                 row.status = transition.to_state.value
+                row.dynamic_followup = None
 
         return self._current_prompt(row)
+
+    async def _generate_followup(self, answer: str, part: int, theme: str) -> str | None:
+        """Generate a contextual follow-up via LLM, with graceful fallback."""
+        try:
+            result = await self.llm_client.generate_followup(answer, part, theme)
+            return result
+        except Exception as exc:
+            logger.debug("Follow-up generation failed (offline fallback): %s", exc)
+            return None
 
     def _question_for_state(self, row: IELTSSession, state: IELTSState) -> tuple[int, str]:
         if state == IELTSState.PART1_QA:
@@ -206,8 +268,13 @@ class IELTSSessionConductor:
         if state == IELTSState.PART2_SPEAKING:
             return 2, row.part2_cue_card["topic"]
         if state == IELTSState.PART2_FOLLOW_UP:
-            return 2, "(follow-up)"
+            return 2, row.dynamic_followup or "Now, let's talk about the topic a little more generally."
         if state == IELTSState.PART3_DISCUSSION:
+            # Serve dynamic follow-up if one exists, otherwise serve bank question
+            followup = getattr(row, "dynamic_followup", None)
+            if followup:
+                row.dynamic_followup = None  # consume it
+                return 3, followup
             return 3, (row.part3_questions or [])[row.part3_index]
         raise ValueError(f"No question mapped for state {state}")
 
@@ -236,15 +303,22 @@ class IELTSSessionConductor:
                 state=state.value, part=2, question=row.part2_cue_card["topic"], time_budget_s=budget
             )
         if state == IELTSState.PART2_FOLLOW_UP:
+            # Use dynamic follow-up if available, else contextual generic
+            followup_q = (
+                getattr(row, "dynamic_followup", None)
+                or "Now, let's discuss the broader aspects of this topic."
+            )
             return CurrentPromptOut(
                 state=state.value, part=2,
-                question="Now, let's talk about the topic a little more generally.",
+                question=followup_q,
                 time_budget_s=budget,
             )
         if state == IELTSState.PART3_DISCUSSION:
+            followup = getattr(row, "dynamic_followup", None)
+            question = followup or (row.part3_questions or [])[row.part3_index]
             return CurrentPromptOut(
                 state=state.value, part=3,
-                question=(row.part3_questions or [])[row.part3_index], time_budget_s=budget,
+                question=question, time_budget_s=budget,
             )
         if state == IELTSState.SCORING:
             return CurrentPromptOut(state=state.value, time_budget_s=budget)
@@ -270,6 +344,15 @@ class IELTSSessionConductor:
         if machine.state == IELTSState.SCORING:
             transition = machine.advance()  # -> COMPLETE
             row.status = transition.to_state.value
-        row.completed_at = datetime.utcnow()
+        row.completed_at = datetime.now(timezone.utc)
         self.db.commit()
+
+        # Auto-cache the fused report so it shows in History immediately.
+        try:
+            from app.services.scoring.report_service import ReportService  # noqa: PLC0415
+            await ReportService(self.db).get_report(row.session_id)
+            logger.info("Cached fused report for IELTS session %s", row.session_id)
+        except Exception as exc:
+            logger.warning("Could not pre-cache IELTS report for %s: %s", row.session_id, exc)
+
         return session_score

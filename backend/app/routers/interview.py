@@ -26,6 +26,7 @@ from app.models.interview import InterviewSessionDetail, JobDescriptionRecord, Q
 from app.models.session import Session as SessionRecord
 from app.services.company_formats import UnknownCompanyFormatError, list_company_formats
 from app.services.conductor import InterviewConductor
+from app.services.scoring.report_service import ReportService
 from app.services.ingestion import (
     JDParser,
     JobDescription,
@@ -557,7 +558,7 @@ async def submit_answer(
 
 
 @router.post("/sessions/{session_id}/end", response_model=SessionResponse)
-def end_session(session_id: str, db: DBSession = Depends(get_db)) -> SessionResponse:
+async def end_session(session_id: str, db: DBSession = Depends(get_db)) -> SessionResponse:
     detail = _get_session_detail(db, session_id)
     sm = SessionStateMachine(session_id=session_id, state=detail.state)
 
@@ -574,6 +575,24 @@ def end_session(session_id: str, db: DBSession = Depends(get_db)) -> SessionResp
     detail.state = sm.state
     detail.ended_at = datetime.now(timezone.utc)
     db.commit()
+
+    # Auto-generate + cache the fused report so the session appears in History
+    # immediately after completion (non-blocking: catches any errors gracefully).
+    try:
+        import asyncio
+        asyncio.create_task(ReportService(db).get_report(session_id))
+    except Exception:
+        try:
+            import asyncio as _aio
+            import logging
+            logger = logging.getLogger("poise.interview")
+            logger.warning("Background report generation unavailable; caching inline")
+            await ReportService(db).get_report(session_id)
+        except Exception as exc:
+            import logging
+            logging.getLogger("poise.interview").warning(
+                "Could not pre-cache report for %s: %s", session_id, exc
+            )
 
     return SessionResponse(
         session_id=session_id,
