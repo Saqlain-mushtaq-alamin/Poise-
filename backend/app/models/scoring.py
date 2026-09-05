@@ -11,7 +11,7 @@ Trends can query and sort without deserializing JSON for every row.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, String, Text
@@ -34,8 +34,8 @@ class SessionReportCache(Base):
 
     report_json = Column(JSON, nullable=False)          # full serialized FusedReport
 
-    generated_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    generated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     debrief_messages = relationship(
         "DebriefMessage",
@@ -53,4 +53,4 @@ class DebriefMessage(Base):
     role = Column(String, nullable=False)   # "user" | "assistant"
     content = Column(Text, nullable=False)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
