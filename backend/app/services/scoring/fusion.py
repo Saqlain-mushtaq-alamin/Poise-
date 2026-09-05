@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from statistics import mean
 from typing import Optional
 
@@ -123,7 +123,7 @@ class FusedReport:
     action_items: list[ActionItem]
     per_question_breakdown: list[QuestionBreakdown]
     duration_minutes: float
-    generated_at: datetime = field(default_factory=datetime.utcnow)
+    generated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     cost_estimate: Optional[CostEstimate] = None
     persona_label: str = ""
     jd_title: str = ""
@@ -162,32 +162,192 @@ class ScoreSourceAdapter(ABC):
 
 class InterviewScoreSourceAdapter(ScoreSourceAdapter):
     """
-    Integration point for Phases 3/4/5/6. Every method below raises
-    `DimensionUnavailable` until you replace its body with a real query
-    against your Phase 3/4/5/6 tables. See README "Wiring the adapters"
-    for exactly what each method is expected to return.
+    Wired against Phase 4 real tables:
+      - QuestionTurn           -> per-question scores and answers
+      - InterviewSessionDetail -> duration, persona, JD reference
+      - JobDescriptionRecord   -> JD title for the report header
+      - CodingRound            -> coding evaluation (Phase 6)
+    Phases 3/5 stubs remain until prosody/webcam analysis is wired.
     """
 
+    def __init__(self, db=None) -> None:
+        self.db = db
+
     async def get_content_scores(self, session_id: str) -> ScoreDimension:
-        # TODO(Phase 4 integration): query interview_answers / evaluations
-        # for `session_id`, average their content-quality scores (0-100).
-        raise DimensionUnavailable("content_quality: Phase 4 adapter not wired")
+        if self.db is None:
+            raise DimensionUnavailable("content_quality: no DB session provided")
+        try:
+            from app.models.interview import QuestionTurn  # noqa: PLC0415
+            turns = (
+                self.db.query(QuestionTurn)
+                .filter(
+                    QuestionTurn.session_id == session_id,
+                    QuestionTurn.evaluation_json.isnot(None),
+                    QuestionTurn.answer_text.isnot(None),
+                )
+                .order_by(QuestionTurn.asked_at)
+                .all()
+            )
+        except Exception as exc:
+            raise DimensionUnavailable(f"content_quality: DB query failed — {exc}") from exc
+
+        if not turns:
+            raise DimensionUnavailable("content_quality: no evaluated answers in this session")
+
+        import json as _json
+        scores: list[float] = []
+        sub_scores: list[SubScore] = []
+        for turn in turns:
+            try:
+                ev = _json.loads(turn.evaluation_json) if turn.evaluation_json else {}
+                raw = float(ev.get("score", 0))
+                score_100 = raw * 100 if raw <= 1.0 else raw
+                scores.append(score_100)
+                sub_scores.append(SubScore(
+                    name=turn.question_text[:60],
+                    score=round(score_100, 1),
+                    detail=ev.get("feedback", ""),
+                ))
+            except (ValueError, TypeError):
+                continue
+
+        if not scores:
+            raise DimensionUnavailable("content_quality: could not parse any evaluation scores")
+
+        return ScoreDimension(
+            name="Content Quality",
+            score=round(mean(scores), 1),
+            max_score=100,
+            weight=0.35,
+            sub_scores=sub_scores,
+            description=f"Average answer quality across {len(scores)} evaluated question(s).",
+            available=True,
+        )
 
     async def get_confidence_summary(self, session_id: str) -> ScoreDimension:
-        # TODO(Phase 5 integration): query webcam_analysis frames/aggregates
-        # for `session_id` (eye contact %, expression stability, posture).
-        raise DimensionUnavailable("delivery_confidence: Phase 5 adapter not wired")
+        raise DimensionUnavailable("delivery_confidence: webcam analysis (Phase 5) not wired yet")
 
     async def get_coding_scores(self, session_id: str) -> ScoreDimension:
-        # TODO(Phase 6 integration): query coding_evaluations for `session_id`
-        # (correctness, code quality, complexity discussion).
-        raise DimensionUnavailable("technical_skill: Phase 6 adapter not wired")
+        if self.db is None:
+            raise DimensionUnavailable("technical_skill: no DB session provided")
+        try:
+            from app.models.coding import CodingRound  # noqa: PLC0415
+            rounds = (
+                self.db.query(CodingRound)
+                .filter(
+                    CodingRound.session_id == session_id,
+                    CodingRound.status == "completed",
+                )
+                .all()
+            )
+        except Exception as exc:
+            raise DimensionUnavailable(f"technical_skill: DB query failed — {exc}") from exc
+
+        if not rounds:
+            raise DimensionUnavailable("technical_skill: no completed coding rounds in this session")
+
+        sub_scores2: list[SubScore] = []
+        all_scores: list[float] = []
+        for rnd in rounds:
+            if rnd.final_evaluation and isinstance(rnd.final_evaluation, dict):
+                overall = float(rnd.final_evaluation.get("overall_score", 0))
+                all_scores.append(overall)
+                sub_scores2.append(SubScore(
+                    name=f"Coding Round ({rnd.id[:8]})",
+                    score=round(overall, 1),
+                    detail="; ".join(rnd.final_evaluation.get("strengths", [])[:2]),
+                ))
+
+        if not all_scores:
+            raise DimensionUnavailable("technical_skill: no finalized coding evaluations found")
+
+        return ScoreDimension(
+            name="Technical Skill",
+            score=round(mean(all_scores), 1),
+            max_score=100,
+            weight=0.25,
+            sub_scores=sub_scores2,
+            description=f"Coding evaluation across {len(all_scores)} round(s).",
+            available=True,
+        )
 
     async def get_communication_scores(self, session_id: str) -> ScoreDimension:
-        # TODO(Phase 3 integration): reuse the prosody metrics computed
-        # live during the session (pace, filler ratio, pause quality) —
-        # the same shape as Phase 7's `ProsodyAnalysis`.
-        raise DimensionUnavailable("communication: Phase 3 adapter not wired")
+        raise DimensionUnavailable("communication: prosody analysis (Phase 3) not wired yet")
+
+    async def get_question_breakdown(self, session_id: str) -> list[QuestionBreakdown]:
+        if self.db is None:
+            return []
+        try:
+            from app.models.interview import QuestionTurn  # noqa: PLC0415
+            import json as _json
+            turns = (
+                self.db.query(QuestionTurn)
+                .filter(QuestionTurn.session_id == session_id)
+                .order_by(QuestionTurn.asked_at)
+                .all()
+            )
+            result = []
+            for turn in turns:
+                ev: dict = {}
+                if turn.evaluation_json:
+                    try:
+                        ev = _json.loads(turn.evaluation_json)
+                    except (ValueError, TypeError):
+                        ev = {}
+                raw = float(ev.get("score", 0))
+                score_100 = raw * 100 if raw <= 1.0 else raw
+                result.append(QuestionBreakdown(
+                    question=turn.question_text,
+                    user_answer=turn.answer_text or "",
+                    score=round(score_100, 1),
+                    skill_tags=["follow_up" if turn.is_follow_up else "main"],
+                ))
+            return result
+        except Exception:
+            return []
+
+    async def get_duration_minutes(self, session_id: str) -> float:
+        if self.db is None:
+            return 0.0
+        try:
+            from app.models.interview import InterviewSessionDetail  # noqa: PLC0415
+            detail = (
+                self.db.query(InterviewSessionDetail)
+                .filter(InterviewSessionDetail.session_id == session_id)
+                .one_or_none()
+            )
+            if detail is None or detail.started_at is None or detail.ended_at is None:
+                return 0.0
+            return round((detail.ended_at - detail.started_at).total_seconds() / 60, 1)
+        except Exception:
+            return 0.0
+
+    async def get_persona_and_jd(self, session_id: str) -> tuple[str, str]:
+        if self.db is None:
+            return "", ""
+        try:
+            from app.models.interview import InterviewSessionDetail, JobDescriptionRecord  # noqa: PLC0415
+            import json as _json
+            detail = (
+                self.db.query(InterviewSessionDetail)
+                .filter(InterviewSessionDetail.session_id == session_id)
+                .one_or_none()
+            )
+            if detail is None:
+                return "", ""
+            persona = detail.persona_id or ""
+            jd_title = ""
+            if detail.jd_id:
+                jd_row = self.db.get(JobDescriptionRecord, detail.jd_id)
+                if jd_row:
+                    try:
+                        jd_data = _json.loads(jd_row.structured_json)
+                        jd_title = jd_data.get("title", "")
+                    except (ValueError, TypeError):
+                        jd_title = ""
+            return persona, jd_title
+        except Exception:
+            return "", ""
 
 
 class IELTSScoreSourceAdapter(ScoreSourceAdapter):

@@ -8,7 +8,7 @@ model-answer, matching the pattern of Phase 7's `IELTSSessionConductor`.
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session as DBSession
@@ -20,6 +20,7 @@ from app.services.scoring.coverage import CoverageMatrix, CoverageMatrixBuilder
 from app.services.scoring.fusion import (
     FusedReport,
     IELTSScoreSourceAdapter,
+    InterviewScoreSourceAdapter,
     QuestionBreakdown,
     ScoreFusionEngine,
 )
@@ -33,7 +34,10 @@ class ReportNotFoundError(Exception):
 class ReportService:
     def __init__(self, db: DBSession, fusion_engine: Optional[ScoreFusionEngine] = None):
         self.db = db
-        self.fusion_engine = fusion_engine or ScoreFusionEngine(ielts_adapter=IELTSScoreSourceAdapter(db))
+        self.fusion_engine = fusion_engine or ScoreFusionEngine(
+            interview_adapter=InterviewScoreSourceAdapter(db),
+            ielts_adapter=IELTSScoreSourceAdapter(db),
+        )
 
     # -- mode detection ----------------------------------------------------
 
@@ -119,7 +123,7 @@ class ReportService:
         row.persona_label = report.persona_label
         row.jd_title = report.jd_title
         row.report_json = payload
-        row.updated_at = datetime.utcnow()
+        row.updated_at = datetime.now(timezone.utc)
         self.db.commit()
 
     # -- history / trends ----------------------------------------------------
