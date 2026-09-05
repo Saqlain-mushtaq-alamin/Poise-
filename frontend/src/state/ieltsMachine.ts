@@ -3,7 +3,8 @@ import { ieltsApi } from "../lib/ieltsApi";
 import type { AnswerResult, CurrentPrompt, IELTSBandScore, IELTSSessionDetail } from "../types/ielts";
 
 interface IELTSMachineContext {
-  sessionId: string | null;
+  sessionId: string | null;       // IELTS-internal id (ielts_sessions.id)
+  parentSessionId: string | null; // Parent sessions.id — used for /scoring/report
   prompt: CurrentPrompt | null;
   score: IELTSBandScore | null;
   error: string | null;
@@ -54,6 +55,7 @@ export const ieltsMachine = setup({
   initial: "idle",
   context: {
     sessionId: null,
+    parentSessionId: null,
     prompt: null,
     score: null,
     error: null,
@@ -74,7 +76,11 @@ export const ieltsMachine = setup({
         },
         onDone: {
           target: "readyToStart",
-          actions: assign({ sessionId: ({ event }) => event.output.id }),
+          actions: assign({
+            sessionId: ({ event }) => event.output.id,
+            // session_id is the parent sessions.id — used by /scoring/report
+            parentSessionId: ({ event }) => (event.output as any).session_id ?? event.output.id,
+          }),
         },
         onError: { target: "error", actions: assign({ error: ({ event }) => String(event.error) }) },
       },

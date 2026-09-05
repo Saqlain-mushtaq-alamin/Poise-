@@ -24,7 +24,7 @@ interface IELTSSessionProps {
 export default function IELTSSession({ api }: IELTSSessionProps) {
   const navigate = useNavigate();
   const {
-    state, send, prompt, score, error, sessionId,
+    state, send, prompt, score, error, sessionId, parentSessionId,
     isPrep: _isPrep, isSpeaking: _isSpeaking, prepRemaining, speakingRemaining, isBusy,
   } = useIELTSSession(api);
 
@@ -46,7 +46,8 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
   const voice = useVoiceInterview({
     backendBaseUrl,
     onAnswerReady: handleAnswerReady,
-    silenceThresholdSecs: 2.5,
+    // silenceThresholdSecs: not overridden — hook default (3.5s) gives
+    // IELTS candidates enough thinking time between sentences.
   });
 
   // ── Voice TTS and auto-listen routing ────────────────────────────────────
@@ -245,8 +246,11 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
           className="ielts-action-button"
           style={{ marginTop: "2rem" }}
           onClick={() => {
-            if (sessionId) {
-              navigate(`/report/${sessionId}`);
+            // Use parentSessionId (parent sessions.id) so the scoring API
+            // can find the fused report — sessionId is the IELTS-internal id.
+            const reportId = parentSessionId || sessionId;
+            if (reportId) {
+              navigate(`/report/${reportId}`);
             }
           }}
         >

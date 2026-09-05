@@ -81,6 +81,7 @@ export function useIELTSSession(api: PoiseAPI | null = null) {
     score: state.context.score,
     error: state.context.error,
     sessionId: state.context.sessionId,
+    parentSessionId: state.context.parentSessionId,
     isPrep,
     isSpeaking,
     isPart1QA,
