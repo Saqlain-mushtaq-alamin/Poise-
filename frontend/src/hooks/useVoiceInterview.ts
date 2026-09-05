@@ -59,7 +59,7 @@ interface UseVoiceInterviewReturn {
 export function useVoiceInterview({
   backendBaseUrl,
   onAnswerReady,
-  silenceThresholdSecs = 2.5,
+  silenceThresholdSecs = 3.5,  // raised from 2.5 — candidates need thinking time
   maxListenSecs = 45,
   enabled = true,
 }: UseVoiceInterviewOptions): UseVoiceInterviewReturn {
@@ -284,9 +284,15 @@ export function useVoiceInterview({
   function submitCurrentTranscript() {
     clearAllTimers();
     const txt = transcriptRef.current.trim();
-    if (txt && phaseRef.current === "listening") {
+    // Require at least 5 words to avoid false silence-detection triggers
+    const wordCount = txt ? txt.split(/\s+/).filter(Boolean).length : 0;
+    if (txt && wordCount >= 5 && phaseRef.current === "listening") {
       setPhase("processing");
       onAnswerReady(txt);
+    } else if (txt && wordCount < 5) {
+      // Too short — reset and keep listening
+      lastActivityRef.current = Date.now();
+      resetSilenceTimer();
     }
   }
 
@@ -481,6 +487,17 @@ export function useVoiceInterview({
 
           const socket = new VoiceSocket(sttUrl, {
             onMessage: (data: any) => {
+              // Handle model-not-available errors sent by the backend
+              if (data?.error) {
+                const errMsg = data.error as string;
+                console.warn("[useVoiceInterview] STT error from backend:", errMsg);
+                setMicError(
+                  data.model_name
+                    ? `Voice recognition model '${data.model_name}' not downloaded. Go to Settings > Hardware to download it.`
+                    : errMsg
+                );
+                return;
+              }
               if (data?.text) {
                 if (data.is_partial) {
                   setInterimTranscript(data.text);

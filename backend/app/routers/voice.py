@@ -218,3 +218,51 @@ async def tts_stream(websocket: WebSocket, tts: TTSEngine = Depends(get_tts_engi
         except RuntimeError:
             pass
 
+
+class STTStatusResponse(BaseModel):
+    model_name: str
+    available: bool
+    message: str = ""
+
+
+@router.get("/stt/status", response_model=STTStatusResponse)
+def get_stt_status(stt: WhisperSTT = Depends(get_stt)) -> STTStatusResponse:
+    """Returns whether the current tier's Whisper model is downloaded and ready."""
+    model_name = stt.model_name
+    try:
+        stt._load_model()
+        return STTStatusResponse(model_name=model_name, available=True)
+    except ModelNotAvailableError:
+        return STTStatusResponse(
+            model_name=model_name,
+            available=False,
+            message=(
+                f"Whisper model '{model_name}' is not downloaded. "
+                "Click 'Download' to fetch it (requires internet, ~75-150MB)."
+            ),
+        )
+    except Exception as exc:
+        return STTStatusResponse(model_name=model_name, available=False, message=str(exc))
+
+
+@router.post("/stt/download")
+async def download_stt_model(stt: WhisperSTT = Depends(get_stt)) -> dict:
+    """Trigger a background download of the current tier's Whisper model weights."""
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
+    model_name = stt.model_name
+
+    def _do_download() -> None:
+        try:
+            from faster_whisper import WhisperModel  # noqa: PLC0415
+            WhisperModel(model_name, device="cpu", compute_type="int8")
+            logger.info("Whisper model '%s' downloaded successfully", model_name)
+        except Exception as exc:
+            logger.error("Whisper model download failed: %s", exc)
+
+    executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="whisper_dl")
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(executor, _do_download)
+
+    return {"status": "downloading", "model_name": model_name}

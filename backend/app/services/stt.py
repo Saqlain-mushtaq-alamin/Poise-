@@ -82,7 +82,7 @@ class Transcription:
 
 
 class WhisperSTT:
-    def __init__(self, tier: HardwareTier = HardwareTier.CLOUD_ASSIST) -> None:
+    def __init__(self, tier: HardwareTier = HardwareTier.LOCAL_LITE) -> None:
         self._tier = tier
         self._model = None
         self._loaded_model_name: str | None = None
@@ -124,7 +124,11 @@ class WhisperSTT:
         Phase 7 (IELTS pronunciation analysis) needs."""
         model = self._load_model()
 
-        raw_segments, info = model.transcribe(str(audio_path), word_timestamps=True)
+        raw_segments, info = model.transcribe(
+            str(audio_path),
+            word_timestamps=True,
+            language="en",  # explicit hint prevents auto-detect failures on short clips
+        )
 
         segments: list[TranscriptionSegment] = []
         total_duration_ms = 0
