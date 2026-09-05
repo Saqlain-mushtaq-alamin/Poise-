@@ -488,15 +488,29 @@ class IELTSTopicGenerator:
         target_band: float = 6.5,
         topics_preference: Optional[str] = None,
         seed: Optional[int] = None,
+        exclude_categories: Optional[list[str]] = None,
     ) -> IELTSTopicSet:
         rng = random.Random(seed)
+        excluded = set(exclude_categories or [])
 
         part1_pool = PART1_TOPICS
         if topics_preference:
             filtered = [t for t in PART1_TOPICS if topics_preference.lower() in t["category"]]
             part1_pool = filtered or PART1_TOPICS
 
-        part1_categories = rng.sample(part1_pool, k=min(4, len(part1_pool)))
+        # Filter out recently-used categories for variety across sessions.
+        fresh_pool = [t for t in part1_pool if t["category"] not in excluded]
+        if len(fresh_pool) < 4:
+            fresh_pool = part1_pool  # fall back to full pool if too few remain
+
+        part1_categories = rng.sample(fresh_pool, k=min(4, len(fresh_pool)))
+
+        # Shuffle question order within each chosen category for extra variety
+        for cat in part1_categories:
+            questions = list(cat.get("questions", []))
+            rng.shuffle(questions)
+            cat = dict(cat)
+            cat["questions"] = questions
 
         cue_card_pool = PART2_CUE_CARDS
         if topics_preference:
