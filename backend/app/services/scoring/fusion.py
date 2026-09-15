@@ -310,15 +310,46 @@ class InterviewScoreSourceAdapter(ScoreSourceAdapter):
         if self.db is None:
             return 0.0
         try:
-            from app.models.interview import InterviewSessionDetail  # noqa: PLC0415
+            from app.models.interview import InterviewSessionDetail, QuestionTurn  # noqa: PLC0415
             detail = (
                 self.db.query(InterviewSessionDetail)
                 .filter(InterviewSessionDetail.session_id == session_id)
                 .one_or_none()
             )
-            if detail is None or detail.started_at is None or detail.ended_at is None:
+            if detail is None:
                 return 0.0
-            return round((detail.ended_at - detail.started_at).total_seconds() / 60, 1)
+
+            start = detail.started_at or detail.created_at
+            end = detail.ended_at
+
+            # Fallback to last answered question timestamp if ended_at wasn't set
+            if end is None:
+                last_turn = (
+                    self.db.query(QuestionTurn)
+                    .filter(QuestionTurn.session_id == session_id, QuestionTurn.answered_at.isnot(None))
+                    .order_by(QuestionTurn.answered_at.desc())
+                    .first()
+                )
+                if last_turn and last_turn.answered_at:
+                    end = last_turn.answered_at
+
+            if start is None or end is None:
+                return 0.0
+
+            delta_seconds = max(0.0, (end - start).total_seconds())
+            duration_mins = round(delta_seconds / 60.0, 1)
+
+            # If questions were answered, ensure minimum duration is at least 1.0 min rather than 0
+            if duration_mins == 0.0:
+                has_turns = (
+                    self.db.query(QuestionTurn.id)
+                    .filter(QuestionTurn.session_id == session_id, QuestionTurn.answer_text.isnot(None))
+                    .first()
+                )
+                if has_turns:
+                    duration_mins = 1.0
+
+            return duration_mins
         except Exception:
             return 0.0
 
