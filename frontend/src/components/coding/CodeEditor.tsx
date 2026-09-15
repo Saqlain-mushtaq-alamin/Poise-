@@ -106,16 +106,26 @@ export function CodeEditor({
           <button
             className="poise-btn poise-btn--secondary"
             onClick={() => onRun(code)}
-            disabled={isRunning || isSubmitting || readOnly}
+            disabled={isRunning || isSubmitting || isReviewing || readOnly}
           >
             {isRunning ? 'Running…' : '▶ Run'}
           </button>
+          {onAskReview && (
+            <button
+              className="poise-btn poise-btn--secondary"
+              onClick={() => onAskReview(code)}
+              disabled={isRunning || isSubmitting || isReviewing || readOnly || !code.trim()}
+              title="Ask AI interviewer to analyze your code and suggest modifications"
+            >
+              {isReviewing ? 'Analyzing…' : '🔍 Review Code'}
+            </button>
+          )}
           <button
             className="poise-btn poise-btn--primary"
             onClick={() => onSubmit(code)}
-            disabled={isRunning || isSubmitting || readOnly}
+            disabled={isRunning || isSubmitting || isReviewing || readOnly}
           >
-            {isSubmitting ? 'Submitting…' : 'Submit'}
+            {isSubmitting ? 'Submitting…' : 'Submit Solution'}
           </button>
         </div>
       </div>
