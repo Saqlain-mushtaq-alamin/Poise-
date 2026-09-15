@@ -1,240 +1,454 @@
-/* Modern IELTS Session UI Styles */
+/* ==========================================================================
+   Poise IELTS Speaking UI Styles
+   Seamlessly integrated with .shell__content, Dashboard & Settings design tokens.
+   ========================================================================== */
 
-.ielts-modern-layout {
-  position: relative;
+.ielts-container {
+  max-width: 960px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  min-height: 100%;
-  padding: 4rem 2rem;
-  background: linear-gradient(135deg, hsl(225, 20%, 12%), hsl(260, 20%, 14%), hsl(225, 20%, 12%));
-  color: var(--color-text-primary);
-  font-family: 'Inter', system-ui, sans-serif;
+  gap: var(--space-6);
+  padding-bottom: var(--space-12);
 }
 
-.ielts-modern-layout::before {
-  content: "";
-  position: absolute;
-  top: -20%;
-  left: -10%;
-  width: 50vw;
-  height: 50vw;
-  background: radial-gradient(circle, hsla(250, 90%, 65%, 0.1) 0%, transparent 70%);
-  z-index: 0;
-  pointer-events: none;
-}
-
-.ielts-modern-layout::after {
-  content: "";
-  position: absolute;
-  bottom: -20%;
-  right: -10%;
-  width: 40vw;
-  height: 40vw;
-  background: radial-gradient(circle, hsla(190, 85%, 55%, 0.1) 0%, transparent 70%);
-  z-index: 0;
-  pointer-events: none;
-}
-
-.ielts-glass-card {
-  position: relative;
-  z-index: 1;
-  background: hsla(225, 20%, 16%, 0.6);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid hsla(0, 0%, 100%, 0.1);
-  border-radius: 24px;
-  padding: 3rem;
-  width: 100%;
-  max-width: 720px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+/* Page Header */
+.ielts-header {
   display: flex;
   flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ielts-header__title-row {
+  display: flex;
   align-items: center;
-  text-align: center;
-  transition: all 0.3s ease;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
 }
 
-.ielts-title {
-  font-size: 2.5rem;
-  font-weight: 700;
-  background: linear-gradient(90deg, var(--color-text-primary), var(--color-accent-secondary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-bottom: 1rem;
-  letter-spacing: -0.5px;
-}
-
-.ielts-subtitle {
-  font-size: 1.1rem;
-  color: var(--color-text-secondary);
-  margin-bottom: 2rem;
-  max-width: 500px;
-  line-height: 1.5;
-}
-
-.ielts-question-text {
+.ielts-header__title {
   font-size: 1.75rem;
-  font-weight: 600;
-  color: var(--color-accent-primary);
-  margin: 1.5rem 0;
-  line-height: 1.4;
-  letter-spacing: -0.2px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 
-.ielts-setup-row {
+.ielts-header__badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-accent-primary) 15%, transparent);
+  color: var(--color-accent-primary);
+  border: 1px solid color-mix(in srgb, var(--color-accent-primary) 30%, transparent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ielts-header__subtitle {
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 70ch;
+}
+
+/* Section Cards & Surfaces */
+.ielts-card {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ielts-card--interactive:hover {
+  border-color: color-mix(in srgb, var(--color-accent-primary) 40%, var(--color-border));
+  box-shadow: var(--shadow-md);
+}
+
+.ielts-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.ielts-card__step {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-accent-primary);
+  background: color-mix(in srgb, var(--color-accent-primary) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent-primary) 30%, transparent);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.ielts-card__title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.ielts-card__desc {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+/* Grid Layouts */
+.ielts-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+
+.ielts-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-4);
+}
+
+/* Part Overview Feature Cards */
+.ielts-part-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  width: 100%;
-  margin-bottom: 1.5rem;
+  gap: var(--space-2);
 }
 
-.ielts-setup-row label {
+.ielts-part-card__tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-accent-secondary);
+}
+
+.ielts-part-card__title {
   font-size: 0.95rem;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  margin-bottom: 0.5rem;
-}
-
-.ielts-setup-input {
-  width: 100%;
-  background: hsla(225, 15%, 10%, 0.5);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 0.8rem 1rem;
+  font-weight: 600;
   color: var(--color-text-primary);
-  font-size: 1rem;
-  outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  margin: 0;
 }
 
-.ielts-setup-input:focus {
-  border-color: var(--color-accent-primary);
-  box-shadow: 0 0 0 3px hsla(250, 90%, 65%, 0.2);
+.ielts-part-card__detail {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  margin: 0;
 }
 
-.ielts-action-button {
-  background: linear-gradient(135deg, var(--color-accent-primary), hsl(250, 90%, 55%));
-  color: white;
-  border: none;
-  border-radius: 12px;
-  padding: 1rem 2rem;
-  font-size: 1.1rem;
+/* Target Band Selector */
+.ielts-band-selector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ielts-band-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.ielts-band-pill {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  width: 100%;
-  max-width: 300px;
-  margin-top: 1rem;
+  transition: all var(--transition-fast);
 }
 
-.ielts-action-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 16px hsla(250, 90%, 65%, 0.3);
+.ielts-band-pill:hover {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  border-color: var(--color-accent-primary);
 }
 
-.ielts-action-button:active:not(:disabled) {
+.ielts-band-pill--active {
+  background: var(--color-accent-primary);
+  color: white;
+  border-color: var(--color-accent-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+.ielts-band-helper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--color-accent-secondary);
+}
+
+.ielts-band-helper strong {
+  color: var(--color-text-primary);
+}
+
+/* Action Buttons */
+.ielts-primary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
+  background: linear-gradient(135deg, var(--color-accent-primary), hsl(250, 90%, 55%));
+  color: white;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
+}
+
+.ielts-primary-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+}
+
+.ielts-primary-btn:active:not(:disabled) {
   transform: translateY(0);
 }
 
-.ielts-action-button:disabled {
-  opacity: 0.6;
+.ielts-primary-btn:disabled {
+  opacity: 0.55;
   cursor: not-allowed;
-  filter: grayscale(0.5);
 }
 
-.ielts-answer-box {
-  width: 100%;
-  background: hsla(225, 15%, 10%, 0.4);
+.ielts-secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-weight: 600;
+  font-size: 0.9rem;
   border: 1px solid var(--color-border);
-  border-radius: 16px;
-  padding: 1.5rem;
-  margin-top: 2rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.ielts-secondary-btn:hover:not(:disabled) {
+  background: var(--color-bg-primary);
+  border-color: var(--color-text-secondary);
+}
+
+.ielts-secondary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Active Session / Live Stage Styles
+   ────────────────────────────────────────────────────────────────────────── */
+
+.ielts-stage-card {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  box-shadow: var(--shadow-md);
   display: flex;
   flex-direction: column;
   align-items: center;
+  text-align: center;
+  gap: var(--space-6);
+  position: relative;
+  overflow: hidden;
 }
 
-.ielts-transcript-status {
-  display: flex;
+.ielts-stage-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-accent-primary), var(--color-accent-secondary));
+}
+
+.ielts-stage-badge {
+  display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--space-2);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.ielts-stage-badge--active {
+  background: color-mix(in srgb, var(--color-accent-primary) 15%, transparent);
+  color: var(--color-accent-primary);
+  border-color: color-mix(in srgb, var(--color-accent-primary) 30%, transparent);
+}
+
+.ielts-stage-question {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.45;
+  margin: 0;
+  max-width: 680px;
+}
+
+.ielts-stage-hint {
+  color: var(--color-text-secondary);
   font-size: 0.95rem;
+  margin: 0;
+  max-width: 540px;
+  line-height: 1.5;
+}
+
+/* Audio Interaction & Speech Box */
+.ielts-voice-workspace {
+  width: 100%;
+  max-width: 720px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.ielts-voice-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.85rem;
   font-weight: 500;
   color: var(--color-text-secondary);
-  margin-bottom: 1rem;
 }
 
-.ielts-status-dot {
+.ielts-voice-pulse {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background-color: var(--color-text-muted);
+  background: var(--color-text-muted);
   transition: all 0.3s ease;
 }
 
-.ielts-status-dot.active {
-  background-color: var(--color-accent-success);
+.ielts-voice-pulse--listening {
+  background: var(--color-accent-primary);
+  box-shadow: 0 0 10px var(--color-accent-primary);
+  animation: pulse-ring 1.5s infinite;
+}
+
+.ielts-voice-pulse--speaking {
+  background: var(--color-accent-success);
   box-shadow: 0 0 10px var(--color-accent-success);
-  animation: pulse 1.5s infinite;
+  animation: pulse-ring 1s infinite;
 }
 
-@keyframes pulse {
-  0% { transform: scale(0.95); opacity: 0.8; }
-  50% { transform: scale(1.1); opacity: 1; }
-  100% { transform: scale(0.95); opacity: 0.8; }
+.ielts-voice-pulse--ai {
+  background: var(--color-accent-secondary);
+  box-shadow: 0 0 10px var(--color-accent-secondary);
+  animation: pulse-ring 1.2s infinite;
 }
 
-.ielts-transcript-text {
-  font-size: 1.15rem;
+@keyframes pulse-ring {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.7; }
+}
+
+.ielts-transcript-display {
+  min-height: 48px;
+  max-height: 140px;
+  overflow-y: auto;
+  font-size: 1.05rem;
   font-style: italic;
   line-height: 1.6;
   color: var(--color-text-primary);
-  min-height: 3rem;
   text-align: center;
+  width: 100%;
+  padding: var(--space-2) var(--space-4);
 }
 
 .ielts-transcript-interim {
-  opacity: 0.6;
+  color: var(--color-text-muted);
 }
 
-.ielts-secondary-button {
-  background: transparent;
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 0.6rem 1.2rem;
-  font-size: 0.95rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  margin-top: 1.5rem;
-}
-
-.ielts-secondary-button:hover {
-  background: hsla(0, 0%, 100%, 0.05);
-  color: var(--color-text-primary);
-  border-color: var(--color-text-muted);
+/* Manual Typing Box */
+.ielts-manual-box {
+  width: 100%;
+  margin-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  text-align: left;
 }
 
 .ielts-manual-textarea {
   width: 100%;
-  background: hsla(225, 15%, 10%, 0.5);
+  background: var(--color-bg-primary);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 1rem;
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
   color: var(--color-text-primary);
-  font-size: 1.05rem;
-  outline: none;
-  resize: vertical;
-  min-height: 120px;
-  margin-bottom: 1rem;
   font-family: inherit;
-  transition: border-color 0.2s ease;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 100px;
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .ielts-manual-textarea:focus {
   border-color: var(--color-accent-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent-primary) 25%, transparent);
+}
+
+.ielts-manual-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* Progress bar / Part navigation header */
+.ielts-stage-nav {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
 }
