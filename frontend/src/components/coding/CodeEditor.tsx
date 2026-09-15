@@ -32,6 +32,8 @@ export interface CodeEditorProps {
   testCases?: TestCase[];
   onSubmit: (code: string) => void;
   onRun: (code: string) => void;
+  onAskReview?: (code: string) => void;
+  isReviewing?: boolean;
   isRunning?: boolean;
   isSubmitting?: boolean;
   readOnly?: boolean;
@@ -55,6 +57,8 @@ export function CodeEditor({
   starterCode,
   onSubmit,
   onRun,
+  onAskReview,
+  isReviewing = false,
   isRunning = false,
   isSubmitting = false,
   readOnly = false,
