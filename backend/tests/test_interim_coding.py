@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import json
 import pytest
-from app.routers.coding import get_provider
 
 
 class ScriptedProvider:
@@ -23,6 +24,8 @@ class ScriptedProvider:
 
 
 def test_review_interim_code_llm(client):
+    from app.routers.coding import get_provider
+
     fake = ScriptedProvider()
     fake.queue_response(json.dumps({
         "interviewer_message": "I see your User model. How will you implement authentication on the endpoints?",
@@ -52,7 +55,8 @@ def test_review_interim_code_llm(client):
 
 
 def test_review_interim_code_heuristic_fallback(client):
-    # Tests that even without queued LLM response or when LLM throws, fallback works cleanly
+    from app.routers.coding import get_provider
+
     class FailingProvider:
         async def chat(self, *args, **kwargs):
             raise RuntimeError("LLM unavailable")
