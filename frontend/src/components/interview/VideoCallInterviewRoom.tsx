@@ -25,6 +25,7 @@ interface VideoCallInterviewRoomProps {
   onSubmitAnswer: (text: string) => void;
   onEnd: () => void;
   onBack: () => void;
+  onViewReport?: () => void;
   backendBaseUrl: string;
   personaName?: string;
   personaVoice?: string;
