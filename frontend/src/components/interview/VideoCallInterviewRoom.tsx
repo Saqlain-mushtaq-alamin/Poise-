@@ -237,7 +237,7 @@ export function VideoCallInterviewRoom({
   backendBaseUrl,
   personaName = "AI Interviewer",
   personaVoice = "en-US-AvaNeural",
-  enableCoding = false,
+  enableCoding: _enableCoding = false,
   sessionId,
 }: VideoCallInterviewRoomProps) {
   const isWarmUp = isWarmUpState(machineState);
