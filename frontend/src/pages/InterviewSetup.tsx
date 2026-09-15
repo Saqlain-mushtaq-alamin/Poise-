@@ -196,6 +196,13 @@ export function InterviewSetup({ api }: InterviewSetupProps) {
           session.endSession();
           session.resetSession();
         }}
+        onViewReport={() => {
+          const id = session.sessionId;
+          if (id) {
+            session.endSession();
+            navigate(`/report/${id}`);
+          }
+        }}
         backendBaseUrl={backendBaseUrl}
         personaName={selectedPersona.name}
         personaVoice={selectedPersona.voice ?? "en-US-AvaNeural"}
