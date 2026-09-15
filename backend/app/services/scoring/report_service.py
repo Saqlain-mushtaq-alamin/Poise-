@@ -142,6 +142,58 @@ class ReportService:
 
     # -- history / trends ----------------------------------------------------
 
+    async def sync_history(self) -> None:
+        """
+        Backfills and refreshes report cache for sessions with evaluated answers
+        or completed status that are missing from cache or have obsolete placeholder 0s.
+        """
+        try:
+            from app.models.interview import QuestionTurn
+            from app.models.ielts import IELTSSession
+
+            # Find all interview session IDs with evaluated turns
+            interview_sids = [
+                r[0]
+                for r in (
+                    self.db.query(QuestionTurn.session_id)
+                    .filter(QuestionTurn.answer_text.isnot(None))
+                    .distinct()
+                    .all()
+                )
+            ]
+            ielts_sids = [
+                r[0]
+                for r in (
+                    self.db.query(IELTSSession.session_id)
+                    .filter(IELTSSession.status == "completed")
+                    .distinct()
+                    .all()
+                )
+            ]
+
+            all_sids = set(interview_sids + ielts_sids)
+            if not all_sids:
+                return
+
+            cached_rows = {
+                r.session_id: r
+                for r in self.db.query(SessionReportCache)
+                .filter(SessionReportCache.session_id.in_(all_sids))
+                .all()
+            }
+
+            for sid in all_sids:
+                cached = cached_rows.get(sid)
+                if cached is None or (cached.overall_score == 0.0 and sid in interview_sids):
+                    try:
+                        await self.get_report(sid, force_refresh=True)
+                    except Exception as exc:
+                        import logging
+                        logging.getLogger("poise.scoring").debug("Could not auto-sync session %s: %s", sid, exc)
+        except Exception as exc:
+            import logging
+            logging.getLogger("poise.scoring").warning("Failed to sync history: %s", exc)
+
     def list_history(self, mode: Optional[str] = None, limit: int = 50, offset: int = 0) -> list[SessionReportCache]:
         q = self.db.query(SessionReportCache).order_by(SessionReportCache.generated_at.desc())
         if mode:

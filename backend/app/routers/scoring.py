@@ -73,6 +73,7 @@ async def get_history(
     offset: int = Query(0, ge=0),
     service: ReportService = Depends(get_report_service),
 ):
+    await service.sync_history()
     rows = service.list_history(mode=mode, limit=limit, offset=offset)
     return [
         SessionSummaryOut(
@@ -90,6 +91,7 @@ async def get_trends(
     last_n: int = Query(20, ge=2, le=100),
     service: ReportService = Depends(get_report_service),
 ):
+    await service.sync_history()
     return service.get_trends(mode=mode, last_n=last_n)
 
 
