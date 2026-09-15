@@ -44,6 +44,7 @@ def create_app() -> FastAPI:
     from app import models  # noqa: F401  (registers ORM classes on Base.metadata)
 
     Base.metadata.create_all(bind=engine)
+    _ensure_sqlite_schema()
 
     from app.routers import (
         coding,
