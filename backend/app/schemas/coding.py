@@ -182,3 +182,22 @@ class CodingRoundCompleteResponse(BaseModel):
     final_evaluation: CodeEvaluation
     execution_summary: ExecutionResult
     screen_evaluations: list[ScreenEvaluation] = Field(default_factory=list)
+
+
+# --------------------------------------------------------------------------
+# Interim Mid-Coding Review
+# --------------------------------------------------------------------------
+
+class InterimCodeReviewRequest(BaseModel):
+    session_id: Optional[str] = None
+    question: str
+    code: str
+    language: str = "python"
+    persona_id: str = "professional"
+
+
+class InterimCodeReviewResponse(BaseModel):
+    interviewer_message: str
+    status: str = "good_progress"  # "on_track" | "needs_modification" | "good_progress"
+    suggested_improvements: list[str] = Field(default_factory=list)
+
