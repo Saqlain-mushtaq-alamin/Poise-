@@ -42,10 +42,24 @@ class ReportService:
     # -- mode detection ----------------------------------------------------
 
     def _detect_mode(self, session_id: str) -> str:
-        ielts_row = (
-            self.db.query(IELTSSession).filter(IELTSSession.session_id == session_id).one_or_none()
-        )
-        return "ielts" if ielts_row is not None else "interview"
+        from app.models.session import Session as SessionRecord
+
+        try:
+            session_row = (
+                self.db.query(SessionRecord).filter(SessionRecord.id == session_id).one_or_none()
+            )
+            if session_row and session_row.mode:
+                return session_row.mode
+        except Exception:
+            pass
+
+        try:
+            ielts_row = (
+                self.db.query(IELTSSession.id).filter(IELTSSession.session_id == session_id).one_or_none()
+            )
+            return "ielts" if ielts_row is not None else "interview"
+        except Exception:
+            return "interview"
 
     # -- report (cached) -----------------------------------------------------
 
