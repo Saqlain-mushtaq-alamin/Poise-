@@ -194,6 +194,7 @@ export function VideoCallInterviewRoom({
   onSubmitAnswer,
   onEnd,
   onBack,
+  onViewReport,
   backendBaseUrl,
   personaName = "AI Interviewer",
   personaVoice = "en-US-AvaNeural",
@@ -343,7 +344,18 @@ export function VideoCallInterviewRoom({
             Check the <strong>Session Report</strong> for your detailed scoring breakdown.
           </p>
           <div className="vcir__complete-time">Session time: {formatTime(timerSecs)}</div>
-          <div className="vcir__complete-actions">
+          <div className="vcir__complete-actions" style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
+            {onViewReport && (
+              <button
+                id="vcir-report-btn"
+                className="vcir__complete-back-btn"
+                style={{ background: "var(--color-accent-primary, #6366f1)", color: "#fff", border: "none" }}
+                onClick={onViewReport}
+                type="button"
+              >
+                📊 View Scoring Report →
+              </button>
+            )}
             <button
               id="vcir-back-btn"
               className="vcir__complete-back-btn"
