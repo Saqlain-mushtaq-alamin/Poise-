@@ -277,12 +277,109 @@
   margin-top: auto;
 }
 
-.poise-problem-panel__hints {
-  color: var(--color-text-secondary);
-}
-
 .poise-screen-capture__error {
   color: var(--color-accent-danger);
   font-size: 13px;
   margin-left: var(--space-2);
 }
+
+/* Interim / Mid-coding Feedback */
+.poise-coding-round__interim-feedback {
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: var(--radius-md, 8px);
+  padding: var(--space-3, 12px);
+  animation: poise-fade-in 0.3s ease-out;
+}
+
+.poise-coding-round__interim-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--color-accent-primary, #818cf8);
+  margin-bottom: 6px;
+}
+
+.poise-coding-round__interim-msg {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--color-text-primary, #f3f4f6);
+  margin-bottom: 8px;
+}
+
+.poise-coding-round__interim-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+.poise-coding-round__interim-list li {
+  margin-bottom: 4px;
+}
+
+@keyframes poise-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Split-screen Studio layout for VideoCallInterviewRoom */
+.vcir--with-coding {
+  display: flex;
+  flex-direction: column;
+}
+
+.vcir__main-container {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.vcir__stage-pane {
+  flex: 1 1 50%;
+  min-width: 380px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  position: relative;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.vcir__coding-pane {
+  flex: 1 1 50%;
+  min-width: 480px;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-primary, #0f1117);
+  overflow: hidden;
+}
+
+.vcir__coding-pane-header {
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-bg-elevated, #1a1d27);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.vcir__coding-pane-title {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--color-text-primary, #fff);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vcir__coding-pane-body {
+  flex: 1;
+  min-height: 0;
+  padding: 8px;
+}
+
