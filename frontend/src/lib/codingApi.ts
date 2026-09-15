@@ -98,4 +98,24 @@ export class CodingAPI {
       `/interview/sessions/${sessionId}/coding-round/${roundId}/complete`
     );
   }
+
+  async reviewInterimCode(req: {
+    sessionId?: string;
+    question: string;
+    code: string;
+    language?: string;
+    personaId?: string;
+  }): Promise<{
+    interviewer_message: string;
+    status: string;
+    suggested_improvements: string[];
+  }> {
+    return this.client.request('POST', '/coding/review-interim', {
+      session_id: req.sessionId,
+      question: req.question,
+      code: req.code,
+      language: req.language || 'python',
+      persona_id: req.personaId || 'professional',
+    });
+  }
 }
