@@ -220,6 +220,90 @@ async def evaluate_code(
 
 
 # ----------------------------------------------------------------------
+# Mid-coding live interim review
+# ----------------------------------------------------------------------
+
+@router.post("/review-interim", response_model=InterimCodeReviewResponse)
+async def review_interim_code(
+    req: InterimCodeReviewRequest,
+    provider=Depends(get_provider),
+):
+    """Real-time interim code review during a live interview.
+    Observes the candidate's code in progress and returns a natural interviewer
+    observation or follow-up question (e.g. asking for modifications, improvements,
+    handling edge cases or authentication).
+    """
+    persona = PERSONAS.get(req.persona_id, PERSONAS["professional"])
+    prompt = f"""You are {persona.name}, conducting a live technical coding interview. Style: {persona.style}.
+The candidate was asked this coding question:
+\"\"\"{req.question}\"\"\"
+
+The candidate has written the following {req.language} code so far:
+```{req.language}
+{req.code}
+```
+
+Observe their code carefully. As a real human interviewer observing their screen in real-time, formulate:
+1. `interviewer_message`: A natural, concise (1-3 sentences) spoken observation, suggestion, or question directly addressed to the candidate. For example, comment on what they've built so far and ask how they'll handle error handling, authentication, edge cases, data validation, or how they'll optimize it. DO NOT solve the problem or dump full code for them; ask an insightful interview question.
+2. `status`: "on_track", "needs_modification", or "good_progress".
+3. `suggested_improvements`: 2-3 brief bullet points of areas to improve (e.g., "Add input validation", "Handle HTTP 401 unauthorized").
+
+Respond with STRICT JSON ONLY:
+{{
+  "interviewer_message": "...",
+  "status": "on_track",
+  "suggested_improvements": ["..."]
+}}
+"""
+    try:
+        from app.services.provider import ModelRole  # noqa: PLC0415
+        from app.services.json_utils import extract_json_from_llm  # noqa: PLC0415
+
+        response = await provider.chat(
+            messages=[
+                {"role": "system", "content": "You are a professional technical interviewer conducting a live coding interview."},
+                {"role": "user", "content": prompt},
+            ],
+            model_role=ModelRole.REASONING,
+            stream=False,
+            response_format={"type": "json_object"},
+            max_tokens=600,
+        )
+        parsed = extract_json_from_llm(response)
+        if isinstance(parsed, dict) and "interviewer_message" in parsed:
+            return InterimCodeReviewResponse(
+                interviewer_message=str(parsed.get("interviewer_message", "")),
+                status=str(parsed.get("status", "good_progress")),
+                suggested_improvements=[str(s) for s in parsed.get("suggested_improvements", [])],
+            )
+    except Exception as e:
+        logger.warning(f"Interim code review via LLM failed: {e}; falling back to heuristic review")
+
+    # Fallback heuristic review based on code content
+    code_lower = req.code.lower()
+    improvements = []
+    if "try" not in code_lower and "except" not in code_lower and "catch" not in code_lower:
+        improvements.append("Add error handling and edge case checks")
+    if "auth" in req.question.lower() and "token" not in code_lower and "permission" not in code_lower and "auth" not in code_lower:
+        improvements.append("Implement authentication and authorization logic")
+    if not improvements:
+        improvements = ["Consider time and space complexity", "Add comments or docstrings explaining the logic"]
+
+    if "auth" in req.question.lower() and ("auth" not in code_lower and "permission" not in code_lower):
+        msg = "I see your foundation coming together. How do you plan to handle the authentication and authorization requirements for this API?"
+    elif len(req.code.strip()) < 80:
+        msg = "Good start on the structure. Walk me through your thinking so far as you flesh out the implementation."
+    else:
+        msg = "Nice progress on the implementation. Have you considered how you'll handle validation and unexpected input or error cases?"
+
+    return InterimCodeReviewResponse(
+        interviewer_message=msg,
+        status="good_progress",
+        suggested_improvements=improvements,
+    )
+
+
+# ----------------------------------------------------------------------
 # Screen / whiteboard VLM evaluation
 # ----------------------------------------------------------------------
 
