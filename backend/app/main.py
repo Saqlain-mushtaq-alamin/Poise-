@@ -26,6 +26,25 @@ from app.config import get_settings
 from app.database import Base, engine
 
 
+def _ensure_sqlite_schema() -> None:
+    """Safely apply missing column migrations on SQLite databases without data loss."""
+    try:
+        with engine.connect() as conn:
+            table_check = conn.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='ielts_sessions'"
+            ).fetchone()
+            if table_check:
+                cols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(ielts_sessions)").fetchall()]
+                if "part2_answer_transcript" not in cols:
+                    conn.exec_driver_sql("ALTER TABLE ielts_sessions ADD COLUMN part2_answer_transcript TEXT")
+                if "dynamic_followup" not in cols:
+                    conn.exec_driver_sql("ALTER TABLE ielts_sessions ADD COLUMN dynamic_followup TEXT")
+                conn.commit()
+    except Exception as exc:
+        import logging
+        logging.getLogger("poise.main").warning("SQLite schema check warning: %s", exc)
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
 
