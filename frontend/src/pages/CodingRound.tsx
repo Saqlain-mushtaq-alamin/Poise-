@@ -113,11 +113,6 @@ app.get('/api/users', authenticate, async (req, res) => {
 }
 `;
   }
-  if (lang === 'sql') {
-    return `-- Write your SQL query below:
-SELECT * FROM users;
-`;
-  }
   return `// Write your code here\n`;
 }
 

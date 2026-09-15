@@ -43,6 +43,45 @@ interface VideoCallInterviewRoomProps {
 
 function isWarmUpState(s: string) { return s === "warmUp"; }
 
+function isCodingQuestionText(text?: string | null): boolean {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  const triggers = [
+    "write code",
+    "design a simple api",
+    "design an api",
+    "design a rest api",
+    "implement a",
+    "implement the",
+    "implement an",
+    "write a function",
+    "write a program",
+    "write a script",
+    "write a query",
+    "write sql",
+    "write the code",
+    "create an api",
+    "create a class",
+    "create a function",
+    "create an endpoint",
+    "using django",
+    "using flask",
+    "using fastapi",
+    "using express",
+    "using spring",
+    "in python",
+    "in javascript",
+    "in typescript",
+    "in java",
+    "in c++",
+    "in sql",
+    "code that",
+    "coding challenge",
+    "live coding",
+  ];
+  return triggers.some((t) => lower.includes(t));
+}
+
 function isListeningPhase(s: string) {
   // Either top-level warmUp or any inProgress sub-state where user can answer
   return (
@@ -227,6 +266,13 @@ export function VideoCallInterviewRoom({
     return () => window.removeEventListener("poise:open-coding", handler);
   }, []);
 
+  // ── Auto-detect coding questions and open the live coding sandbox automatically ──
+  useEffect(() => {
+    if (currentMessage && isCodingQuestionText(currentMessage)) {
+      setShowCoding(true);
+    }
+  }, [currentMessage]);
+
   // ── Answer submission — reads machineState via ref (no stale closure) ──
   const handleAnswerReady = useCallback(
     (text: string) => {
@@ -373,7 +419,7 @@ export function VideoCallInterviewRoom({
   const displayTranscript = voice.transcript + (voice.interimTranscript ? " " + voice.interimTranscript : "");
 
   return (
-    <div className="vcir">
+    <div className={`vcir${showCoding ? " vcir--with-coding" : ""}`}>
       {/* ── Top bar ── */}
       <div className="vcir__top-bar">
         <div className="vcir__top-brand">
@@ -384,106 +430,149 @@ export function VideoCallInterviewRoom({
         <div className="vcir__timer">{formatTime(timerSecs)}</div>
       </div>
 
-      {/* ── Main stage ── */}
-      <div className="vcir__stage">
-        {/* AI panel */}
-        <div className="vcir__ai-panel">
-          <div className="vcir__ai-panel-inner">
-            <AIAvatar speaking={voice.isAISpeaking} name={personaName} />
-            <div className="vcir__ai-name">{personaName}</div>
-            <Waveform level={voice.aiAudioLevel} active={voice.isAISpeaking} color="var(--color-accent-primary)" />
-            {currentMessage && (
-              <div className="vcir__ai-speech-bubble">
-                <p>{currentMessage}</p>
+      {/* ── Main content (Split-screen when coding is active) ── */}
+      <div className="vcir__main-container">
+        {/* Left / Primary Stage Pane */}
+        <div className="vcir__stage-pane">
+          <div className="vcir__stage">
+            {/* AI panel */}
+            <div className="vcir__ai-panel">
+              <div className="vcir__ai-panel-inner">
+                <AIAvatar speaking={voice.isAISpeaking} name={personaName} />
+                <div className="vcir__ai-name">{personaName}</div>
+                <Waveform level={voice.aiAudioLevel} active={voice.isAISpeaking} color="var(--color-accent-primary)" />
+                {currentMessage && (
+                  <div className="vcir__ai-speech-bubble">
+                    <p>{currentMessage}</p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* User panel */}
-        <div className="vcir__user-panel">
-          <UserCamera active={camEnabled} />
-          {voice.phase === "listening" && (
-            <div className="vcir__user-waveform">
-              <Waveform level={voice.vadLevel} active={voice.isSpeaking} color="var(--color-accent-secondary)" />
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* ── Mic error banner ── */}
-      {voice.micError && (
-        <div className="vcir__mic-error-banner" role="alert">
-          <div className="vcir__mic-error-header">🎙️ Microphone issue detected</div>
-          <pre className="vcir__mic-error-body">{voice.micError}</pre>
-          <div className="vcir__mic-error-actions">
-            <button
-              className="vcir__mic-error-retry"
-              onClick={() => { voice.clearTranscript(); voice.startListening(); }}
-            >
-              🔄 Retry Microphone
-            </button>
-            <button
-              className="vcir__mic-error-text"
-              onClick={() => setShowManualInput(true)}
-            >
-              💬 Type Instead
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Transcript bar ── */}
-      {voice.phase === "listening" && (
-        <div className="vcir__transcript-area">
-          <div className="vcir__transcript-label">
-            <span className={`vcir__transcript-dot${voice.isSpeaking ? " vcir__transcript-dot--active" : ""}`} />
-            {voice.isSpeaking ? "Speaking… (stop for 2.5 s to auto-submit)" : voice.transcript ? "Pause detected — will submit shortly" : "Listening for your answer…"}
-          </div>
-          {displayTranscript && (
-            <div className="vcir__transcript-text">
-              <span className="vcir__transcript-final">{voice.transcript}</span>
-              {voice.interimTranscript && (
-                <span className="vcir__transcript-interim"> {voice.interimTranscript}</span>
+            {/* User panel */}
+            <div className="vcir__user-panel">
+              <UserCamera active={camEnabled} />
+              {voice.phase === "listening" && (
+                <div className="vcir__user-waveform">
+                  <Waveform level={voice.vadLevel} active={voice.isSpeaking} color="var(--color-accent-secondary)" />
+                </div>
               )}
             </div>
-          )}
-          {!voice.speechApiAvailable && (
-            <p className="vcir__transcript-hint" style={{ color: "var(--color-accent-info, #60a5fa)" }}>
-              🎤 Whisper STT active (Bluetooth/headphone mode). Auto-submits after 2.5 s pause, or 45 s max.
-            </p>
-          )}
-          <p className="vcir__transcript-hint">
-            <button className="vcir__transcript-manual-btn" onClick={() => setShowManualInput(v => !v)}>
-              {showManualInput ? "Hide text input" : "Type your answer instead"}
-            </button>
-          </p>
-        </div>
-      )}
-
-      {/* ── Manual text input ── */}
-      {(showManualInput || !voiceEnabled) && (
-        <div className="vcir__manual-input-area">
-          <textarea
-            className="vcir__manual-textarea"
-            value={manualAnswer}
-            onChange={e => setManualAnswer(e.target.value)}
-            placeholder={isWarmUp ? "Type your reply…" : "Type your answer…"}
-            rows={3}
-            onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleManualSend(); }}
-          />
-          <div className="vcir__manual-send-row">
-            <span className="vcir__manual-hint">Ctrl+Enter to send</span>
-            <button
-              className="vcir__manual-send-btn"
-              onClick={handleManualSend}
-              disabled={!manualAnswer.trim() || busy}
-            >
-              {busy ? "Sending…" : "Send ↩"}
-            </button>
           </div>
+
+          {/* ── Mic error banner ── */}
+          {voice.micError && (
+            <div className="vcir__mic-error-banner" role="alert">
+              <div className="vcir__mic-error-header">🎙️ Microphone issue detected</div>
+              <pre className="vcir__mic-error-body">{voice.micError}</pre>
+              <div className="vcir__mic-error-actions">
+                <button
+                  className="vcir__mic-error-retry"
+                  onClick={() => { voice.clearTranscript(); voice.startListening(); }}
+                >
+                  🔄 Retry Microphone
+                </button>
+                <button
+                  className="vcir__mic-error-text"
+                  onClick={() => setShowManualInput(true)}
+                >
+                  💬 Type Instead
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Transcript bar ── */}
+          {voice.phase === "listening" && (
+            <div className="vcir__transcript-area">
+              <div className="vcir__transcript-label">
+                <span className={`vcir__transcript-dot${voice.isSpeaking ? " vcir__transcript-dot--active" : ""}`} />
+                {voice.isSpeaking ? "Speaking… (stop for 2.5 s to auto-submit)" : voice.transcript ? "Pause detected — will submit shortly" : "Listening for your answer…"}
+              </div>
+              {displayTranscript && (
+                <div className="vcir__transcript-text">
+                  <span className="vcir__transcript-final">{voice.transcript}</span>
+                  {voice.interimTranscript && (
+                    <span className="vcir__transcript-interim"> {voice.interimTranscript}</span>
+                  )}
+                </div>
+              )}
+              {!voice.speechApiAvailable && (
+                <p className="vcir__transcript-hint" style={{ color: "var(--color-accent-info, #60a5fa)" }}>
+                  🎤 Whisper STT active (Bluetooth/headphone mode). Auto-submits after 2.5 s pause, or 45 s max.
+                </p>
+              )}
+              <p className="vcir__transcript-hint">
+                <button className="vcir__transcript-manual-btn" onClick={() => setShowManualInput(v => !v)}>
+                  {showManualInput ? "Hide text input" : "Type your answer instead"}
+                </button>
+              </p>
+            </div>
+          )}
+
+          {/* ── Manual text input ── */}
+          {(showManualInput || !voiceEnabled) && (
+            <div className="vcir__manual-input-area">
+              <textarea
+                className="vcir__manual-textarea"
+                value={manualAnswer}
+                onChange={e => setManualAnswer(e.target.value)}
+                placeholder={isWarmUp ? "Type your reply…" : "Type your answer…"}
+                rows={3}
+                onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleManualSend(); }}
+              />
+              <div className="vcir__manual-send-row">
+                <span className="vcir__manual-hint">Ctrl+Enter to send</span>
+                <button
+                  className="vcir__manual-send-btn"
+                  onClick={handleManualSend}
+                  disabled={!manualAnswer.trim() || busy}
+                >
+                  {busy ? "Sending…" : "Send ↩"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Right / Live Coding Pane (Split-Screen) */}
+        {showCoding && (
+          <div className="vcir__coding-pane">
+            <div className="vcir__coding-pane-header">
+              <span className="vcir__coding-pane-title">
+                💻 <span>Live Coding Environment</span>
+              </span>
+              <button
+                className="vcir__ctrl-btn"
+                onClick={() => setShowCoding(false)}
+                style={{ padding: "4px 12px", fontSize: "0.8rem", minWidth: "unset" }}
+                title="Hide coding panel"
+              >
+                ✕ Hide
+              </button>
+            </div>
+            <div className="vcir__coding-pane-body">
+              <CodingRound
+                sessionId={sessionId ?? "demo-session"}
+                codingApi={new CodingAPI(sharedApi as any)}
+                questionPrompt={currentMessage ?? undefined}
+                personaId={personaName ? personaName.toLowerCase() : "professional"}
+                onInterimReview={(interviewerMessage) => {
+                  if (voiceEnabled) {
+                    voice.speakAsAI(interviewerMessage, personaVoice);
+                  }
+                }}
+                onComplete={(_eval, codeSubmitted) => {
+                  if (codeSubmitted) {
+                    const answer = `Here is my code solution:\n\n\`\`\`\n${codeSubmitted}\n\`\`\``;
+                    handleAnswerReady(answer);
+                  }
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ── Feedback toast ── */}
       {showFeedback && lastFeedback && <FeedbackToast feedback={lastFeedback} />}
@@ -534,19 +623,17 @@ export function VideoCallInterviewRoom({
           <span className="vcir__ctrl-label">{voiceEnabled ? "Voice" : "Text"}</span>
         </button>
 
-        {/* Coding sandbox */}
-        {enableCoding && (
-          <button
-            id="vcir-code-btn"
-            className="vcir__ctrl-btn"
-            onClick={() => window.dispatchEvent(new CustomEvent("poise:open-coding"))}
-            title="Open coding sandbox"
-            aria-label="Open coding sandbox"
-          >
-            <span className="vcir__ctrl-icon">💻</span>
-            <span className="vcir__ctrl-label">Code</span>
-          </button>
-        )}
+        {/* Coding toggle */}
+        <button
+          id="vcir-code-btn"
+          className={`vcir__ctrl-btn${showCoding ? " vcir__ctrl-btn--active" : ""}`}
+          onClick={() => setShowCoding((v) => !v)}
+          title={showCoding ? "Hide coding sandbox" : "Open coding sandbox"}
+          aria-label="Toggle coding sandbox"
+        >
+          <span className="vcir__ctrl-icon">💻</span>
+          <span className="vcir__ctrl-label">{showCoding ? "Hide Code" : "Code"}</span>
+        </button>
 
         <div className="vcir__bottom-spacer" />
 
@@ -566,27 +653,6 @@ export function VideoCallInterviewRoom({
           <span className="vcir__ctrl-label">End</span>
         </button>
       </div>
-
-      {/* ── Coding sandbox overlay ── */}
-      {showCoding && (
-        <div className="vcir__coding-overlay" style={{ position: "absolute", inset: 0, zIndex: 100, display: "flex", flexDirection: "column", backgroundColor: "var(--color-bg-primary, #0f1117)" }}>
-          <div style={{ padding: "var(--space-2, 8px) var(--space-4, 16px)", display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--color-bg-elevated, #1a1d27)", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
-            <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--color-text-primary, #fff)", display: "flex", alignItems: "center", gap: "8px" }}>
-              💻 <span>Coding Sandbox</span>
-            </span>
-            <button className="vcir__ctrl-btn vcir__ctrl-btn--danger" onClick={() => setShowCoding(false)} style={{ padding: "6px 16px", fontSize: "0.85rem", minWidth: "unset" }}>
-              ✕ Close
-            </button>
-          </div>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <CodingRound
-              sessionId={sessionId ?? "demo-session"}
-              codingApi={new CodingAPI(sharedApi as any)}
-              onComplete={() => setShowCoding(false)}
-            />
-          </div>
-        </div>
-      )}
 
       {/* ── Processing overlay (lighter — doesn't block End) ── */}
       {busy && voice.phase === "processing" && (
