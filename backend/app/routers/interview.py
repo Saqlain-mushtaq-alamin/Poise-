@@ -525,6 +525,7 @@ async def submit_answer(
         detail.state = sm.state
         detail.ended_at = datetime.now(timezone.utc)
         db.commit()
+        _trigger_report_cache(session_id)
         return AnswerResponse(
             score=evaluation.score,
             feedback=evaluation.feedback,
@@ -557,6 +558,27 @@ async def submit_answer(
     )
 
 
+def _trigger_report_cache(session_id: str) -> None:
+    """Safely spawn a background task to compute & cache the report with its own DB session."""
+    import asyncio
+    from app.database import session_scope
+
+    async def _worker():
+        try:
+            with session_scope() as bg_db:
+                await ReportService(bg_db).get_report(session_id, force_refresh=True)
+        except Exception as exc:
+            import logging
+            logging.getLogger("poise.interview").warning(
+                "Could not pre-cache report for %s: %s", session_id, exc
+            )
+
+    try:
+        asyncio.create_task(_worker())
+    except Exception:
+        pass
+
+
 @router.post("/sessions/{session_id}/end", response_model=SessionResponse)
 async def end_session(session_id: str, db: DBSession = Depends(get_db)) -> SessionResponse:
     detail = _get_session_detail(db, session_id)
@@ -577,22 +599,7 @@ async def end_session(session_id: str, db: DBSession = Depends(get_db)) -> Sessi
     db.commit()
 
     # Auto-generate + cache the fused report so the session appears in History
-    # immediately after completion (non-blocking: catches any errors gracefully).
-    try:
-        import asyncio
-        asyncio.create_task(ReportService(db).get_report(session_id))
-    except Exception:
-        try:
-            import asyncio as _aio
-            import logging
-            logger = logging.getLogger("poise.interview")
-            logger.warning("Background report generation unavailable; caching inline")
-            await ReportService(db).get_report(session_id)
-        except Exception as exc:
-            import logging
-            logging.getLogger("poise.interview").warning(
-                "Could not pre-cache report for %s: %s", session_id, exc
-            )
+    _trigger_report_cache(session_id)
 
     return SessionResponse(
         session_id=session_id,
