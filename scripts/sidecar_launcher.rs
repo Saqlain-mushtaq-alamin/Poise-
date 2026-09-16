@@ -71,23 +71,32 @@ fn assign_to_job_object(child_handle: std::os::windows::io::RawHandle) {
     }
 }
 
+fn clean_path(p: &Path) -> PathBuf {
+    if let Ok(c) = p.canonicalize() {
+        let s = c.to_string_lossy();
+        if let Some(stripped) = s.strip_prefix(r"\\?\") {
+            return PathBuf::from(stripped);
+        }
+        return c;
+    }
+    p.to_path_buf()
+}
+
 fn find_python_and_backend() -> (PathBuf, PathBuf) {
     let current_exe = env::current_exe().unwrap_or_default();
     let exe_dir = current_exe.parent().unwrap_or(Path::new("."));
 
     let candidates = vec![
+        (PathBuf::from(r"D:\canvas\Poise-\backend\.venv\Scripts\python.exe"), PathBuf::from(r"D:\canvas\Poise-\backend")),
         (exe_dir.join("../../backend/.venv/Scripts/python.exe"), exe_dir.join("../../backend")),
         (exe_dir.join("../backend/.venv/Scripts/python.exe"), exe_dir.join("../backend")),
         (PathBuf::from("backend/.venv/Scripts/python.exe"), PathBuf::from("backend")),
         (PathBuf::from(".venv/Scripts/python.exe"), PathBuf::from(".")),
-        (PathBuf::from(r"D:\canvas\Poise-\backend\.venv\Scripts\python.exe"), PathBuf::from(r"D:\canvas\Poise-\backend")),
     ];
 
     for (py, backend) in candidates {
         if py.exists() && backend.exists() {
-            let py_canonical = py.canonicalize().unwrap_or(py);
-            let backend_canonical = backend.canonicalize().unwrap_or(backend);
-            return (py_canonical, backend_canonical);
+            return (clean_path(&py), clean_path(&backend));
         }
     }
 
@@ -122,6 +131,7 @@ fn main() {
         }
         Err(err) => {
             eprintln!("Failed to spawn python backend (using {:?} in {:?}): {}", python_path, backend_dir, err);
+            let _ = std::fs::write("sidecar_launcher_error.log", format!("Failed: {}\nPython: {:?}\nDir: {:?}", err, python_path, backend_dir));
             std::process::exit(1);
         }
     }
