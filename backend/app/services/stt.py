@@ -163,7 +163,10 @@ class WhisperSTT:
         )
 
     async def transcribe_stream(
-        self, audio_chunks: AsyncIterable[bytes], buffer_seconds: float = 2.0
+        self,
+        audio_chunks: AsyncIterable[bytes],
+        buffer_seconds: float = 1.5,
+        sample_rate: int = 16000,
     ) -> AsyncGenerator[TranscriptionSegment, None]:
         """Streaming transcription for the live WebSocket endpoint.
 
@@ -178,29 +181,39 @@ class WhisperSTT:
         """
         model = self._load_model()  # raises early if unavailable, before buffering anything
         buffer = bytearray()
-        bytes_per_second = 16_000 * 2  # 16kHz, 16-bit mono PCM
+        bytes_per_second = sample_rate * 2  # 16-bit mono PCM
         buffer_threshold = int(bytes_per_second * buffer_seconds)
 
         async for chunk in audio_chunks:
             buffer.extend(chunk)
             if len(buffer) >= buffer_threshold:
-                segment = self._transcribe_buffer(model, bytes(buffer), is_partial=True)
+                segment = self._transcribe_buffer(
+                    model, bytes(buffer), is_partial=True, sample_rate=sample_rate
+                )
                 buffer.clear()
                 if segment is not None:
                     yield segment
 
         if buffer:
-            segment = self._transcribe_buffer(model, bytes(buffer), is_partial=False)
+            segment = self._transcribe_buffer(
+                model, bytes(buffer), is_partial=False, sample_rate=sample_rate
+            )
             if segment is not None:
                 yield segment
 
     def _transcribe_buffer(
-        self, model, pcm_bytes: bytes, is_partial: bool
+        self, model, pcm_bytes: bytes, is_partial: bool, sample_rate: int = 16000
     ) -> TranscriptionSegment | None:  # pragma: no cover — needs a real model; mocked in tests
         import numpy as np
 
         audio = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / 32768.0
-        raw_segments, info = model.transcribe(audio, word_timestamps=False)
+        if sample_rate != 16000 and len(audio) > 0:
+            target_len = int(len(audio) * 16000 / sample_rate)
+            if target_len > 0:
+                indices = np.linspace(0, len(audio) - 1, target_len)
+                audio = np.interp(indices, np.arange(len(audio)), audio).astype(np.float32)
+
+        raw_segments, info = model.transcribe(audio, word_timestamps=False, language="en")
         raw_segments = list(raw_segments)
         if not raw_segments:
             return None
