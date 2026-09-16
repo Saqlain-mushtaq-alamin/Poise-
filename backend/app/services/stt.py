@@ -213,7 +213,10 @@ class WhisperSTT:
                 indices = np.linspace(0, len(audio) - 1, target_len)
                 audio = np.interp(indices, np.arange(len(audio)), audio).astype(np.float32)
 
-        raw_segments, info = model.transcribe(audio, word_timestamps=False, language="en")
+        try:
+            raw_segments, info = model.transcribe(audio, word_timestamps=False, language="en")
+        except TypeError:
+            raw_segments, info = model.transcribe(audio, word_timestamps=False)
         raw_segments = list(raw_segments)
         if not raw_segments:
             return None
