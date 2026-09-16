@@ -154,9 +154,9 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
 
         {/* Live Audio Transcript Display */}
         <div className="ielts-transcript-display">
-          {voice.transcript ? (
+          {(voice.transcript || voice.interimTranscript) ? (
             <>
-              <span>{voice.transcript}</span>
+              {voice.transcript && <span>{voice.transcript}</span>}
               {voice.interimTranscript && (
                 <span className="ielts-transcript-interim"> {voice.interimTranscript}</span>
               )}
