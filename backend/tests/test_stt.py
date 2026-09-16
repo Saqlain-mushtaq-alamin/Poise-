@@ -28,10 +28,9 @@ def test_set_tier_updates_model_name():
 
 
 @pytest.mark.asyncio
-async def test_transcribe_complete_raises_clear_error_when_model_unavailable():
-    # faster-whisper genuinely isn't installed here — this is the real
-    # fallback path, not a simulated one.
+async def test_transcribe_complete_raises_clear_error_when_model_unavailable(monkeypatch):
     stt = WhisperSTT(HardwareTier.CLOUD_ASSIST)
+    monkeypatch.setattr(stt, "_load_model", lambda: (_ for _ in ()).throw(ModelNotAvailableError("tiny")))
     with pytest.raises(ModelNotAvailableError) as exc_info:
         await stt.transcribe_complete(Path("/tmp/does-not-matter.wav"))
 
@@ -40,8 +39,9 @@ async def test_transcribe_complete_raises_clear_error_when_model_unavailable():
 
 
 @pytest.mark.asyncio
-async def test_transcribe_stream_raises_immediately_when_model_unavailable():
+async def test_transcribe_stream_raises_immediately_when_model_unavailable(monkeypatch):
     stt = WhisperSTT(HardwareTier.LOCAL_LITE)
+    monkeypatch.setattr(stt, "_load_model", lambda: (_ for _ in ()).throw(ModelNotAvailableError("base")))
 
     async def one_chunk():
         yield b"\x00\x00" * 100
