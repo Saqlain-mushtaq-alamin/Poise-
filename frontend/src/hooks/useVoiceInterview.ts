@@ -465,7 +465,12 @@ export function useVoiceInterview({
       const AudioCtxClass =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const ctx = new AudioCtxClass();
+      let ctx: AudioContext;
+      try {
+        ctx = new AudioCtxClass({ sampleRate: 16000 });
+      } catch {
+        ctx = new AudioCtxClass();
+      }
       if (ctx.state === "suspended") await ctx.resume().catch(() => {});
       micCtxRef.current = ctx;
       const src = ctx.createMediaStreamSource(stream);
@@ -483,7 +488,7 @@ export function useVoiceInterview({
         try {
           const wsProto = backendBaseUrl.startsWith("https") ? "wss:" : "ws:";
           const host = backendBaseUrl.replace(/^https?:\/\//, "");
-          const sttUrl = `${wsProto}//${host}/voice/stt/stream`;
+          const sttUrl = `${wsProto}//${host}/voice/stt/stream?sample_rate=${ctx.sampleRate}`;
 
           const socket = new VoiceSocket(sttUrl, {
             onMessage: (data: any) => {
