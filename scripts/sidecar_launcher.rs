@@ -66,8 +66,7 @@ fn assign_to_job_object(child_handle: std::os::windows::io::RawHandle) {
                 std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as DWORD,
             );
             AssignProcessToJobObject(job, child_handle as HANDLE);
-            // Intentionally keep job open so it closes when this process exits
-            std::mem::forget(job);
+            let _ = job;
         }
     }
 }
