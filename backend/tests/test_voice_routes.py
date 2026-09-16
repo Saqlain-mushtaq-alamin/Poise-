@@ -80,14 +80,23 @@ def test_vad_status_websocket_increments_timestamp_across_frames(client):
     assert second["timestamp_ms"] == 30
 
 
-def test_stt_stream_websocket_reports_model_unavailable_gracefully(client):
-    # faster-whisper isn't installed in this environment, so this exercises
-    # the real graceful-degradation path end to end over an actual socket.
+def test_stt_stream_websocket_reports_model_unavailable_gracefully(client, monkeypatch):
+    from app.services.stt import ModelNotAvailableError, WhisperSTT
+
+    def fake_transcribe_stream(self, chunks, buffer_seconds=1.5, sample_rate=16000):
+        async def gen():
+            if False:
+                yield
+            raise ModelNotAvailableError("base")
+        return gen()
+
+    monkeypatch.setattr(WhisperSTT, "transcribe_stream", fake_transcribe_stream)
+
     with client.websocket_connect("/voice/stt/stream") as ws:
         ws.send_bytes(_tone_pcm16_bytes())
         response = ws.receive_json()
 
     assert "error" in response
     assert "model_name" in response
-    # Default tier is now LOCAL_LITE -> "base" model (Fix 4: better accuracy)
     assert response["model_name"] == "base"
+
