@@ -188,7 +188,7 @@ class WhisperSTT:
             buffer.extend(chunk)
             if len(buffer) >= buffer_threshold:
                 segment = self._transcribe_buffer(
-                    model, bytes(buffer), is_partial=False, sample_rate=sample_rate
+                    model, bytes(buffer), is_partial=True, sample_rate=sample_rate
                 )
                 buffer.clear()
                 if segment is not None:
