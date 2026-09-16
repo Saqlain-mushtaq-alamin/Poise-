@@ -504,11 +504,15 @@ export function useVoiceInterview({
                 return;
               }
               if (data?.text) {
-                if (data.is_partial) {
-                  setInterimTranscript(data.text);
-                } else {
-                  setTranscript(prev => (prev + " " + data.text).trim());
-                  setInterimTranscript("");
+                const text = String(data.text).trim();
+                if (text) {
+                  lastActivityRef.current = Date.now();
+                  if (data.is_partial) {
+                    setInterimTranscript(text);
+                  } else {
+                    setTranscript(prev => (prev ? prev + " " + text : text).trim());
+                    setInterimTranscript("");
+                  }
                   if (phaseRef.current === "listening") resetSilenceTimer();
                 }
               }
