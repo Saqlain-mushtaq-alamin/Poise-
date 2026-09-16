@@ -148,7 +148,11 @@ async def vad_status_stream(websocket: WebSocket, vad: VAD = Depends(get_vad)) -
 
 
 @router.websocket("/stt/stream")
-async def stt_stream(websocket: WebSocket, stt: WhisperSTT = Depends(get_stt)) -> None:
+async def stt_stream(
+    websocket: WebSocket,
+    sample_rate: int = 16000,
+    stt: WhisperSTT = Depends(get_stt),
+) -> None:
     """Client sends binary PCM16 audio frames; server replies with one JSON
     TranscriptionSegment message per buffered window (see
     WhisperSTT.transcribe_stream), and a final `{"error": ...}` message
@@ -163,7 +167,7 @@ async def stt_stream(websocket: WebSocket, stt: WhisperSTT = Depends(get_stt)) -
                 return
 
     try:
-        async for segment in stt.transcribe_stream(receive_chunks()):
+        async for segment in stt.transcribe_stream(receive_chunks(), sample_rate=sample_rate):
             await websocket.send_json(
                 {
                     "text": segment.text,
