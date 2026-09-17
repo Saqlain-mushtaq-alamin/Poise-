@@ -8,6 +8,7 @@ import os
 
 sys.path.insert(0, os.path.abspath("backend"))
 from app.services.stt import WhisperSTT, HardwareTier
+from faster_whisper import WhisperModel
 
 async def gen_audio(text):
     communicate = edge_tts.Communicate(text, 'en-US-JennyNeural')
@@ -26,22 +27,27 @@ async def gen_audio(text):
     return bytes(pcm)
 
 async def test_stream():
-    test_phrase = 'I believe that technology has dramatically changed how people communicate in modern society.'
+    test_phrase = "I believe that technology has dramatically changed how people communicate in modern society."
+    print("Generating speech audio...")
     pcm = await gen_audio(test_phrase)
+    print(f"Audio duration: {len(pcm) / 32000:.2f} seconds")
     
     stt = WhisperSTT(tier=HardwareTier.LOCAL_LITE)
+    # Force CPU for test
+    stt._model = WhisperModel("small.en", device="cpu", compute_type="int8", cpu_threads=8)
+    stt._loaded_model_name = stt.model_name
     
     async def chunk_generator():
         chunk_size = 4096 * 2
         for i in range(0, len(pcm), chunk_size):
             yield pcm[i:i+chunk_size]
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.05)
             
-    print('Streaming transcription results:')
+    print("Streaming transcription results:")
     idx = 0
     async for segment in stt.transcribe_stream(chunk_generator(), buffer_seconds=1.5, sample_rate=16000):
         idx += 1
-        print(f'[{idx}] partial={segment.is_partial}: "{segment.text}"')
+        print(f"[{idx}] partial={segment.is_partial}: '{segment.text}'")
 
 if __name__ == "__main__":
     asyncio.run(test_stream())
