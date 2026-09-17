@@ -27,13 +27,16 @@ async def gen_audio(text):
     return bytes(pcm)
 
 async def test_stream():
-    test_phrase = "I believe that technology has dramatically changed how people communicate in modern society."
-    print("Generating speech audio...")
+    test_phrase = (
+        "Well, in my opinion, living in a big city offers numerous advantages. "
+        "For instance, public transportation is very convenient, and there are many job opportunities. "
+        "However, the cost of living can be quite high, which creates pressure for young professionals."
+    )
+    print("Generating longer speech audio...")
     pcm = await gen_audio(test_phrase)
     print(f"Audio duration: {len(pcm) / 32000:.2f} seconds")
     
     stt = WhisperSTT(tier=HardwareTier.LOCAL_LITE)
-    # Force CPU for test
     stt._model = WhisperModel("small.en", device="cpu", compute_type="int8", cpu_threads=8)
     stt._loaded_model_name = stt.model_name
     
@@ -45,9 +48,12 @@ async def test_stream():
             
     print("Streaming transcription results:")
     idx = 0
+    import time
+    t0 = time.time()
     async for segment in stt.transcribe_stream(chunk_generator(), buffer_seconds=1.5, sample_rate=16000):
         idx += 1
-        print(f"[{idx}] partial={segment.is_partial}: '{segment.text}'")
+        elapsed = time.time() - t0
+        print(f"[{elapsed:.2f}s] #{idx} partial={segment.is_partial}: '{segment.text}'")
 
 if __name__ == "__main__":
     asyncio.run(test_stream())
