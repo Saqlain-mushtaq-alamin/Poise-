@@ -188,8 +188,9 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
               type="button"
               className="ielts-secondary-btn"
               onClick={() => {
-                if (voice.transcript.trim()) {
-                  handleAnswerReady(voice.transcript);
+                const textToSubmit = (voice.transcript + " " + (voice.interimTranscript || "")).trim();
+                if (textToSubmit) {
+                  handleAnswerReady(textToSubmit);
                   voice.clearTranscript();
                 }
                 voice.stopListening();
