@@ -205,10 +205,16 @@ async fn health_check_loop(app: AppHandle, port: u16) {
     }
 }
 
-fn parse_port_line(line: &str) -> Option<u16> {
-    line.trim()
-        .strip_prefix("POISE_SIDECAR_PORT=")
-        .and_then(|p| p.parse().ok())
+fn parse_port_line(output: &str) -> Option<u16> {
+    for line in output.lines() {
+        let trimmed = line.trim();
+        if let Some(p) = trimmed.strip_prefix("POISE_SIDECAR_PORT=") {
+            if let Ok(port) = p.trim().parse::<u16>() {
+                return Some(port);
+            }
+        }
+    }
+    None
 }
 
 /// Called from the window `close-requested` handler (see lib.rs). Sends a
@@ -242,6 +248,10 @@ mod tests {
         assert_eq!(parse_port_line("POISE_SIDECAR_PORT=54321\n"), Some(54321));
         assert_eq!(parse_port_line("some other log line"), None);
         assert_eq!(parse_port_line("POISE_SIDECAR_PORT=not-a-number"), None);
+        assert_eq!(
+            parse_port_line("POISE_SIDECAR_PORT=8000\r\nINFO: Started server process [1234]\n"),
+            Some(8000)
+        );
     }
 
     #[test]
