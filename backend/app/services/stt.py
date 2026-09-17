@@ -100,9 +100,8 @@ class WhisperSTT:
     def _load_model(self):
         """Lazily imports and constructs the faster-whisper model. Raises
         `ModelNotAvailableError` if the library isn't installed or the
-        model weights aren't present — both of which are true in this
-        sandbox, so this path is written but not exercised by a test that
-        actually loads a model (see test_stt.py for the mocked equivalent)."""
+        model weights aren't present. Gracefully falls back to CPU if
+        CUDA libraries (e.g. cublas64_12.dll on Windows) are missing."""
         if self.is_model_loaded():
             return self._model
 
@@ -111,12 +110,36 @@ class WhisperSTT:
         except ImportError as err:
             raise ModelNotAvailableError(self.model_name) from err
 
+        model = None
+        # Try loading on auto (which may select CUDA if GPU exists)
         try:
-            self._model = WhisperModel(self.model_name, device="auto", compute_type="auto")
-            self._loaded_model_name = self.model_name
-        except Exception as err:  # noqa: BLE001 — model files missing, corrupt, etc.
-            raise ModelNotAvailableError(self.model_name) from err
+            candidate = WhisperModel(self.model_name, device="auto", compute_type="auto")
+            # Verify CUDA actually works by checking a test encode
+            import numpy as np
+            dummy_audio = np.zeros(1600, dtype=np.float32)
+            try:
+                candidate.transcribe(dummy_audio, word_timestamps=False)
+                model = candidate
+            except Exception as runtime_err:
+                logger.warning(
+                    "Whisper CUDA runtime failed (%s). Falling back to CPU.", runtime_err
+                )
+                model = None
+        except Exception as err:
+            logger.info("WhisperModel(device='auto') failed: %s", err)
+            model = None
 
+        if model is None:
+            try:
+                model = WhisperModel(self.model_name, device="cpu", compute_type="int8")
+            except Exception as cpu_err:
+                try:
+                    model = WhisperModel(self.model_name, device="cpu", compute_type="auto")
+                except Exception as final_err:
+                    raise ModelNotAvailableError(self.model_name) from final_err
+
+        self._model = model
+        self._loaded_model_name = self.model_name
         return self._model
 
     async def transcribe_complete(self, audio_path: Path) -> Transcription:
@@ -124,11 +147,23 @@ class WhisperSTT:
         Phase 7 (IELTS pronunciation analysis) needs."""
         model = self._load_model()
 
-        raw_segments, info = model.transcribe(
-            str(audio_path),
-            word_timestamps=True,
-            language="en",  # explicit hint prevents auto-detect failures on short clips
-        )
+        try:
+            raw_segments, info = model.transcribe(
+                str(audio_path),
+                word_timestamps=True,
+                language="en",  # explicit hint prevents auto-detect failures on short clips
+            )
+        except Exception as exc:
+            logger.warning("transcribe_complete failed (%s). Retrying on CPU.", exc)
+            from faster_whisper import WhisperModel
+            self._model = WhisperModel(self.model_name, device="cpu", compute_type="int8")
+            self._loaded_model_name = self.model_name
+            model = self._model
+            raw_segments, info = model.transcribe(
+                str(audio_path),
+                word_timestamps=True,
+                language="en",
+            )
 
         segments: list[TranscriptionSegment] = []
         total_duration_ms = 0
@@ -214,9 +249,22 @@ class WhisperSTT:
                 audio = np.interp(indices, np.arange(len(audio)), audio).astype(np.float32)
 
         try:
-            raw_segments, info = model.transcribe(audio, word_timestamps=False, language="en")
-        except TypeError:
-            raw_segments, info = model.transcribe(audio, word_timestamps=False)
+            try:
+                raw_segments, info = model.transcribe(audio, word_timestamps=False, language="en")
+            except TypeError:
+                raw_segments, info = model.transcribe(audio, word_timestamps=False)
+        except Exception as exc:
+            logger.warning("Transcription failed (%s). Retrying on CPU.", exc)
+            try:
+                from faster_whisper import WhisperModel
+                self._model = WhisperModel(self.model_name, device="cpu", compute_type="int8")
+                self._loaded_model_name = self.model_name
+                model = self._model
+                raw_segments, info = model.transcribe(audio, word_timestamps=False, language="en")
+            except Exception as retry_exc:
+                logger.error("CPU transcription retry failed: %s", retry_exc)
+                return None
+
         raw_segments = list(raw_segments)
         if not raw_segments:
             return None
