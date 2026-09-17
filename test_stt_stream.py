@@ -5,9 +5,8 @@ import av
 import numpy as np
 import sys
 import os
+import time
 
-sys.path.insert(0, os.path.abspath("backend"))
-from app.services.stt import WhisperSTT, HardwareTier
 from faster_whisper import WhisperModel
 
 async def gen_audio(text):
@@ -26,34 +25,46 @@ async def gen_audio(text):
             pcm.extend(resampled.to_ndarray().tobytes())
     return bytes(pcm)
 
-async def test_stream():
+async def test():
     test_phrase = (
         "Well, in my opinion, living in a big city offers numerous advantages. "
         "For instance, public transportation is very convenient, and there are many job opportunities. "
         "However, the cost of living can be quite high, which creates pressure for young professionals."
     )
-    print("Generating longer speech audio...")
+    print("Generating audio...")
     pcm = await gen_audio(test_phrase)
-    print(f"Audio duration: {len(pcm) / 32000:.2f} seconds")
+    model = WhisperModel("small.en", device="cpu", compute_type="int8", cpu_threads=8)
     
-    stt = WhisperSTT(tier=HardwareTier.LOCAL_LITE)
-    stt._model = WhisperModel("small.en", device="cpu", compute_type="int8", cpu_threads=8)
-    stt._loaded_model_name = stt.model_name
+    chunk_size = 4096 * 2 # ~250ms
+    buffer = bytearray()
     
-    async def chunk_generator():
-        chunk_size = 4096 * 2
-        for i in range(0, len(pcm), chunk_size):
-            yield pcm[i:i+chunk_size]
-            await asyncio.sleep(0.05)
-            
-    print("Streaming transcription results:")
-    idx = 0
-    import time
+    print("\n--- Testing with Anti-Hallucination & Clean Parameters ---")
     t0 = time.time()
-    async for segment in stt.transcribe_stream(chunk_generator(), buffer_seconds=1.5, sample_rate=16000):
-        idx += 1
-        elapsed = time.time() - t0
-        print(f"[{elapsed:.2f}s] #{idx} partial={segment.is_partial}: '{segment.text}'")
+    for i in range(0, len(pcm), chunk_size):
+        buffer.extend(pcm[i:i+chunk_size])
+        if len(buffer) >= 32000 * 1.5 and (len(buffer) % (32000 * 1.5) < chunk_size):
+            audio = np.frombuffer(bytes(buffer), dtype=np.int16).astype(np.float32) / 32768.0
+            t_chunk_0 = time.time()
+            segs, info = model.transcribe(
+                audio,
+                language="en",
+                beam_size=5,
+                temperature=0.0,
+                vad_filter=True,
+                vad_parameters=dict(min_silence_duration_ms=500),
+                condition_on_previous_text=False,
+                repetition_penalty=1.2,
+                no_repeat_ngram_size=3,
+                compression_ratio_threshold=2.4,
+                log_prob_threshold=-1.0,
+                no_speech_threshold=0.6,
+                hallucination_silence_threshold=1.5,
+            )
+            raw = list(segs)
+            text = " ".join(s.text.strip() for s in raw)
+            t_chunk_1 = time.time()
+            elapsed = time.time() - t0
+            print(f"[{elapsed:5.2f}s | chunk took {(t_chunk_1 - t_chunk_0)*1000:4.0f}ms] '{text}'")
 
 if __name__ == "__main__":
-    asyncio.run(test_stream())
+    asyncio.run(test())
