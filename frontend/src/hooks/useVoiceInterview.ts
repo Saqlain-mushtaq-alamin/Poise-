@@ -396,13 +396,9 @@ export function useVoiceInterview({
             const text = String(data.text).trim();
             if (text) {
               lastActivityRef.current = Date.now();
-              // In streaming Whisper, each segment is a newly transcribed slice of audio.
-              // Accumulate each newly transcribed segment into the running transcript.
-              setTranscript((prev) => {
-                const combined = prev ? `${prev} ${text}` : text;
-                transcriptRef.current = combined;
-                return combined;
-              });
+              // Streaming Whisper sends the full coherent utterance transcription without severed words
+              setTranscript(text);
+              transcriptRef.current = text;
               setInterimTranscript("");
               if (phaseRef.current === "listening") resetSilenceTimer();
             }
