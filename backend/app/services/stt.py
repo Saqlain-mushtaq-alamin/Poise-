@@ -168,22 +168,31 @@ class WhisperSTT:
                     word_timestamps=True,
                     language="en",
                     beam_size=5,
-                    vad_filter=True,
                     temperature=0.0,
-                    initial_prompt="IELTS speaking test practice interview with clear, natural spoken English.",
+                    vad_filter=True,
+                    vad_parameters=dict(min_silence_duration_ms=500),
+                    condition_on_previous_text=False,
+                    repetition_penalty=1.2,
+                    no_repeat_ngram_size=3,
+                    compression_ratio_threshold=2.4,
+                    log_prob_threshold=-1.0,
+                    no_speech_threshold=0.6,
+                    hallucination_silence_threshold=1.5,
                 )
             except TypeError:
                 return m.transcribe(str(audio_path), word_timestamps=True, language="en")
 
         try:
-            raw_segments, info = _do_transcribe(model)
+            raw_gen, info = _do_transcribe(model)
+            raw_segments = list(raw_gen)
         except Exception as exc:
             logger.warning("transcribe_complete failed (%s). Retrying on CPU.", exc)
             from faster_whisper import WhisperModel
             self._model = WhisperModel(self.model_name, device="cpu", compute_type="int8", cpu_threads=8)
             self._loaded_model_name = self.model_name
             model = self._model
-            raw_segments, info = _do_transcribe(model)
+            raw_gen, info = _do_transcribe(model)
+            raw_segments = list(raw_gen)
 
         segments: list[TranscriptionSegment] = []
         total_duration_ms = 0
@@ -276,6 +285,13 @@ class WhisperSTT:
                 indices = np.linspace(0, len(audio) - 1, target_len)
                 audio = np.interp(indices, np.arange(len(audio)), audio).astype(np.float32)
 
+        # Gentle gain normalization for low-volume microphones
+        if len(audio) > 0:
+            rms = np.sqrt(np.mean(audio**2))
+            if 1e-4 < rms < 0.08:
+                gain = min(0.08 / rms, 4.0)
+                audio = np.clip(audio * gain, -1.0, 1.0)
+
         def _do_transcribe(m):
             try:
                 return m.transcribe(
@@ -283,11 +299,16 @@ class WhisperSTT:
                     word_timestamps=False,
                     language="en",
                     beam_size=5,
-                    vad_filter=True,
                     temperature=0.0,
-                    no_speech_threshold=0.6,
+                    vad_filter=True,
+                    vad_parameters=dict(min_silence_duration_ms=500),
                     condition_on_previous_text=False,
-                    initial_prompt="IELTS speaking test practice interview with clear, natural spoken English.",
+                    repetition_penalty=1.2,
+                    no_repeat_ngram_size=3,
+                    compression_ratio_threshold=2.4,
+                    log_prob_threshold=-1.0,
+                    no_speech_threshold=0.6,
+                    hallucination_silence_threshold=1.5,
                 )
             except TypeError:
                 try:
@@ -296,7 +317,8 @@ class WhisperSTT:
                     return m.transcribe(audio, word_timestamps=False)
 
         try:
-            raw_segments, info = _do_transcribe(model)
+            raw_gen, info = _do_transcribe(model)
+            raw_segments = list(raw_gen)
         except Exception as exc:
             logger.warning("Transcription failed (%s). Retrying on CPU.", exc)
             try:
@@ -304,12 +326,12 @@ class WhisperSTT:
                 self._model = WhisperModel(self.model_name, device="cpu", compute_type="int8", cpu_threads=8)
                 self._loaded_model_name = self.model_name
                 model = self._model
-                raw_segments, info = _do_transcribe(model)
+                raw_gen, info = _do_transcribe(model)
+                raw_segments = list(raw_gen)
             except Exception as retry_exc:
                 logger.error("CPU transcription retry failed: %s", retry_exc)
                 return None
 
-        raw_segments = list(raw_segments)
         if not raw_segments:
             return None
 
