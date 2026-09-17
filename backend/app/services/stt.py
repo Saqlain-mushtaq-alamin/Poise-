@@ -119,13 +119,14 @@ class WhisperSTT:
 
         model = None
         for candidate_name in candidate_names:
-            # 1. Try loading on auto (which may select CUDA if GPU exists)
+            # 1. Try loading on auto/cuda if available
             try:
                 candidate = WhisperModel(candidate_name, device="auto", compute_type="auto")
                 import numpy as np
                 dummy_audio = np.zeros(1600, dtype=np.float32)
                 try:
-                    candidate.transcribe(dummy_audio, word_timestamps=False)
+                    gen, _ = candidate.transcribe(dummy_audio, word_timestamps=False)
+                    next(gen, None)
                     model = candidate
                     break
                 except Exception as runtime_err:
