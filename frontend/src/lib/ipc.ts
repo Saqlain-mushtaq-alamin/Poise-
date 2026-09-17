@@ -11,7 +11,9 @@
  */
 import type { SidecarStatus } from "./types";
 
-const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
+const isTauri =
+  typeof window !== "undefined" &&
+  ("__TAURI__" in window || "__TAURI_INTERNALS__" in window);
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauri) {
