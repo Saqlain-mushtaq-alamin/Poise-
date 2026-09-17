@@ -97,17 +97,25 @@ export function useVoiceInterview({
 
   const transcriptRef = useRef("");
   const phaseRef = useRef<VoicePhase>("idle");
+  const interimTranscriptRef = useRef("");
   const sttSocketRef = useRef<VoiceSocket | null>(null);
   const processorNodeRef = useRef<ScriptProcessorNode | null>(null);
 
   // keep refs in sync
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
+  useEffect(() => { interimTranscriptRef.current = interimTranscript; }, [interimTranscript]);
 
-  // Check Speech API availability once — WebView2 does NOT have webkitSpeechRecognition
+  // Check Speech API availability once.
+  // WebView2 on Windows defines window.webkitSpeechRecognition, but it cannot connect
+  // to Google Cloud Speech recognition without embedded API keys and throws network errors.
+  // In Tauri desktop apps we prioritize the local Whisper WebSocket STT.
   useEffect(() => {
     const win = window as unknown as Record<string, unknown>;
-    const SR = win.SpeechRecognition ?? win.webkitSpeechRecognition;
+    const isTauriEnv =
+      typeof window !== "undefined" &&
+      ("__TAURI__" in window || "__TAURI_INTERNALS__" in window);
+    const SR = !isTauriEnv && (win.SpeechRecognition ?? win.webkitSpeechRecognition);
     setSpeechApiAvailable(!!SR);
   }, []);
 
@@ -283,13 +291,13 @@ export function useVoiceInterview({
 
   function submitCurrentTranscript() {
     clearAllTimers();
-    const txt = transcriptRef.current.trim();
-    // Require at least 5 words to avoid false silence-detection triggers
+    const txt = (transcriptRef.current + " " + (interimTranscriptRef.current || "")).trim();
+    // Require at least 3 words to avoid false silence-detection triggers while allowing natural concise answers
     const wordCount = txt ? txt.split(/\s+/).filter(Boolean).length : 0;
-    if (txt && wordCount >= 5 && phaseRef.current === "listening") {
+    if (txt && wordCount >= 3 && phaseRef.current === "listening") {
       setPhase("processing");
       onAnswerReady(txt);
-    } else if (txt && wordCount < 5) {
+    } else if (txt && wordCount < 3) {
       // Too short — reset and keep listening
       lastActivityRef.current = Date.now();
       resetSilenceTimer();
@@ -363,6 +371,73 @@ export function useVoiceInterview({
     tick();
   }
 
+  // ---- Whisper WebSocket STT ----
+  function startWhisperSTT(ctx: AudioContext, stream: MediaStream) {
+    if (!backendBaseUrl || sttSocketRef.current) return;
+    try {
+      const wsProto = backendBaseUrl.startsWith("https") ? "wss:" : "ws:";
+      const host = backendBaseUrl.replace(/^https?:\/\//, "");
+      const sttUrl = `${wsProto}//${host}/voice/stt/stream?sample_rate=${ctx.sampleRate}`;
+
+      const socket = new VoiceSocket(sttUrl, {
+        onMessage: (data: any) => {
+          // Handle model-not-available errors sent by the backend
+          if (data?.error) {
+            const errMsg = data.error as string;
+            console.warn("[useVoiceInterview] STT error from backend:", errMsg);
+            setMicError(
+              data.model_name
+                ? `Voice recognition model '${data.model_name}' not ready: ${errMsg}`
+                : errMsg
+            );
+            return;
+          }
+          if (data?.text) {
+            const text = String(data.text).trim();
+            if (text) {
+              lastActivityRef.current = Date.now();
+              // In streaming Whisper, each segment is a newly transcribed slice of audio.
+              // Accumulate each newly transcribed segment into the running transcript.
+              setTranscript((prev) => {
+                const combined = prev ? `${prev} ${text}` : text;
+                transcriptRef.current = combined;
+                return combined;
+              });
+              setInterimTranscript("");
+              if (phaseRef.current === "listening") resetSilenceTimer();
+            }
+          }
+        },
+        onError: (err) => {
+          console.warn("[useVoiceInterview] STT WebSocket error:", err);
+        },
+      });
+      sttSocketRef.current = socket;
+
+      // Create ScriptProcessor to capture PCM audio frames
+      const processor = ctx.createScriptProcessor(4096, 1, 1);
+      processorNodeRef.current = processor;
+      processor.onaudioprocess = (e) => {
+        if (phaseRef.current === "listening" && sttSocketRef.current?.state === "open") {
+          const inputData = e.inputBuffer.getChannelData(0);
+          const pcm16 = float32ToPCM16Bytes(inputData);
+          sttSocketRef.current.sendBytes(pcm16);
+        }
+      };
+
+      const src = ctx.createMediaStreamSource(stream);
+      src.connect(processor);
+
+      // Mute before destination to prevent local feedback/echo while keeping Web Audio processing alive
+      const muteNode = ctx.createGain();
+      muteNode.gain.value = 0;
+      processor.connect(muteNode);
+      muteNode.connect(ctx.destination);
+    } catch (sttErr) {
+      console.warn("[useVoiceInterview] STT WebSocket setup failed:", sttErr);
+    }
+  }
+
   // ---- Web Speech API ----
   function startSpeechRecognition() {
     const win = window as unknown as Record<string, any>;
@@ -396,6 +471,16 @@ export function useVoiceInterview({
     rec.onerror = (e: any) => {
       if (e.error !== "no-speech") {
         console.warn("[SpeechRecognition] error:", e.error);
+        if (
+          (e.error === "network" || e.error === "service-not-allowed" || e.error === "not-allowed") &&
+          backendBaseUrl &&
+          !sttSocketRef.current &&
+          micCtxRef.current &&
+          micStreamRef.current
+        ) {
+          console.info("[SpeechRecognition] Web Speech API unavailable, activating Whisper WebSocket STT fallback");
+          startWhisperSTT(micCtxRef.current, micStreamRef.current);
+        }
       }
     };
 
@@ -480,60 +565,19 @@ export function useVoiceInterview({
       micAnalyserRef.current = analyser;
 
       startMicLevelPoll(analyser);
-      startSpeechRecognition();
 
-      // Whisper WebSocket STT — used as primary path in Tauri WebView2
-      // where webkitSpeechRecognition is unavailable
-      if (!speechApiAvailable && backendBaseUrl) {
-        try {
-          const wsProto = backendBaseUrl.startsWith("https") ? "wss:" : "ws:";
-          const host = backendBaseUrl.replace(/^https?:\/\//, "");
-          const sttUrl = `${wsProto}//${host}/voice/stt/stream?sample_rate=${ctx.sampleRate}`;
+      const isTauriEnv =
+        typeof window !== "undefined" &&
+        ("__TAURI__" in window || "__TAURI_INTERNALS__" in window);
+      const useWebSpeech = speechApiAvailable && !isTauriEnv;
 
-          const socket = new VoiceSocket(sttUrl, {
-            onMessage: (data: any) => {
-              // Handle model-not-available errors sent by the backend
-              if (data?.error) {
-                const errMsg = data.error as string;
-                console.warn("[useVoiceInterview] STT error from backend:", errMsg);
-                setMicError(
-                  data.model_name
-                    ? `Voice recognition model '${data.model_name}' not downloaded. Go to Settings > Hardware to download it.`
-                    : errMsg
-                );
-                return;
-              }
-              if (data?.text) {
-                const text = String(data.text).trim();
-                if (text) {
-                  lastActivityRef.current = Date.now();
-                  if (data.is_partial) {
-                    setInterimTranscript(text);
-                  } else {
-                    setTranscript(prev => (prev ? prev + " " + text : text).trim());
-                    setInterimTranscript("");
-                  }
-                  if (phaseRef.current === "listening") resetSilenceTimer();
-                }
-              }
-            },
-          });
-          sttSocketRef.current = socket;
+      if (useWebSpeech) {
+        startSpeechRecognition();
+      }
 
-          const processor = ctx.createScriptProcessor(4096, 1, 1);
-          processorNodeRef.current = processor;
-          processor.onaudioprocess = (e) => {
-            if (phaseRef.current === "listening" && sttSocketRef.current?.state === "open") {
-              const inputData = e.inputBuffer.getChannelData(0);
-              const pcm16 = float32ToPCM16Bytes(inputData);
-              sttSocketRef.current.sendBytes(pcm16);
-            }
-          };
-          src.connect(processor);
-          processor.connect(ctx.destination);
-        } catch (sttErr) {
-          console.warn("[useVoiceInterview] STT WebSocket setup failed:", sttErr);
-        }
+      // Whisper WebSocket STT — primary path in Tauri WebView2 and fallback when Web Speech API is unavailable
+      if (!useWebSpeech && backendBaseUrl) {
+        startWhisperSTT(ctx, stream);
       }
 
       // Start the silence interval checker (handles BT headphone mic silence)
@@ -580,6 +624,8 @@ export function useVoiceInterview({
   }, []);
 
   const clearTranscript = useCallback(() => {
+    transcriptRef.current = "";
+    interimTranscriptRef.current = "";
     setTranscript("");
     setInterimTranscript("");
   }, []);
