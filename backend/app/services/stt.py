@@ -101,7 +101,9 @@ class WhisperSTT:
         """Lazily imports and constructs the faster-whisper model. Raises
         `ModelNotAvailableError` if the library isn't installed or the
         model weights aren't present. Gracefully falls back to CPU if
-        CUDA libraries (e.g. cublas64_12.dll on Windows) are missing."""
+        CUDA libraries (e.g. cublas64_12.dll on Windows) are missing.
+        Prioritizes high-accuracy English models (small.en, base.en) for
+        IELTS and interview practice."""
         if self.is_model_loaded():
             return self._model
 
@@ -110,33 +112,44 @@ class WhisperSTT:
         except ImportError as err:
             raise ModelNotAvailableError(self.model_name) from err
 
-        model = None
-        # Try loading on auto (which may select CUDA if GPU exists)
-        try:
-            candidate = WhisperModel(self.model_name, device="auto", compute_type="auto")
-            # Verify CUDA actually works by checking a test encode
-            import numpy as np
-            dummy_audio = np.zeros(1600, dtype=np.float32)
-            try:
-                candidate.transcribe(dummy_audio, word_timestamps=False)
-                model = candidate
-            except Exception as runtime_err:
-                logger.warning(
-                    "Whisper CUDA runtime failed (%s). Falling back to CPU.", runtime_err
-                )
-                model = None
-        except Exception as err:
-            logger.info("WhisperModel(device='auto') failed: %s", err)
-            model = None
+        candidate_names = []
+        if self.model_name in ("base", "small"):
+            candidate_names.extend(["small.en", "base.en"])
+        candidate_names.append(self.model_name)
 
-        if model is None:
+        model = None
+        for candidate_name in candidate_names:
+            # 1. Try loading on auto (which may select CUDA if GPU exists)
             try:
-                model = WhisperModel(self.model_name, device="cpu", compute_type="int8")
+                candidate = WhisperModel(candidate_name, device="auto", compute_type="auto")
+                import numpy as np
+                dummy_audio = np.zeros(1600, dtype=np.float32)
+                try:
+                    candidate.transcribe(dummy_audio, word_timestamps=False)
+                    model = candidate
+                    break
+                except Exception as runtime_err:
+                    logger.warning(
+                        "Whisper CUDA runtime failed (%s). Trying CPU for %s.",
+                        runtime_err,
+                        candidate_name,
+                    )
+            except Exception as err:
+                logger.info("WhisperModel(%s, device='auto') failed: %s", candidate_name, err)
+
+            # 2. Try CPU int8 (fast and highly accurate on multi-core CPUs)
+            try:
+                model = WhisperModel(candidate_name, device="cpu", compute_type="int8", cpu_threads=8)
+                break
             except Exception as cpu_err:
                 try:
-                    model = WhisperModel(self.model_name, device="cpu", compute_type="auto")
-                except Exception as final_err:
-                    raise ModelNotAvailableError(self.model_name) from final_err
+                    model = WhisperModel(candidate_name, device="cpu", compute_type="auto", cpu_threads=8)
+                    break
+                except Exception:
+                    continue
+
+        if model is None:
+            raise ModelNotAvailableError(self.model_name)
 
         self._model = model
         self._loaded_model_name = self.model_name
@@ -147,23 +160,29 @@ class WhisperSTT:
         Phase 7 (IELTS pronunciation analysis) needs."""
         model = self._load_model()
 
+        def _do_transcribe(m):
+            try:
+                return m.transcribe(
+                    str(audio_path),
+                    word_timestamps=True,
+                    language="en",
+                    beam_size=5,
+                    vad_filter=True,
+                    temperature=0.0,
+                    initial_prompt="IELTS speaking test practice interview with clear, natural spoken English.",
+                )
+            except TypeError:
+                return m.transcribe(str(audio_path), word_timestamps=True, language="en")
+
         try:
-            raw_segments, info = model.transcribe(
-                str(audio_path),
-                word_timestamps=True,
-                language="en",  # explicit hint prevents auto-detect failures on short clips
-            )
+            raw_segments, info = _do_transcribe(model)
         except Exception as exc:
             logger.warning("transcribe_complete failed (%s). Retrying on CPU.", exc)
             from faster_whisper import WhisperModel
-            self._model = WhisperModel(self.model_name, device="cpu", compute_type="int8")
+            self._model = WhisperModel(self.model_name, device="cpu", compute_type="int8", cpu_threads=8)
             self._loaded_model_name = self.model_name
             model = self._model
-            raw_segments, info = model.transcribe(
-                str(audio_path),
-                word_timestamps=True,
-                language="en",
-            )
+            raw_segments, info = _do_transcribe(model)
 
         segments: list[TranscriptionSegment] = []
         total_duration_ms = 0
@@ -205,36 +224,44 @@ class WhisperSTT:
     ) -> AsyncGenerator[TranscriptionSegment, None]:
         """Streaming transcription for the live WebSocket endpoint.
 
-        faster-whisper doesn't natively stream partial results from a
-        chunk-at-a-time input, so this buffers incoming PCM into
-        `buffer_seconds`-sized windows and re-transcribes each window,
-        marking every result but the last as partial — the same pattern
-        faster-whisper-based streaming demos use. This orchestration logic
-        (buffering, partial/final flagging, ordering) is exercised in
-        test_stt.py with `_transcribe_buffer` mocked; the model call
-        itself is not.
+        Maintains audio context without destructive chopping at arbitrary
+        time boundaries, avoiding severed words and mid-syllable hallucinations.
         """
         model = self._load_model()  # raises early if unavailable, before buffering anything
         buffer = bytearray()
         bytes_per_second = sample_rate * 2  # 16-bit mono PCM
         buffer_threshold = int(bytes_per_second * buffer_seconds)
 
+        last_transcribed_len = 0
+        last_yielded_text = ""
+
         async for chunk in audio_chunks:
             buffer.extend(chunk)
-            if len(buffer) >= buffer_threshold:
+            if len(buffer) - last_transcribed_len >= buffer_threshold:
                 segment = self._transcribe_buffer(
                     model, bytes(buffer), is_partial=True, sample_rate=sample_rate
                 )
-                buffer.clear()
-                if segment is not None:
+                last_transcribed_len = len(buffer)
+                if segment is not None and segment.text:
+                    last_yielded_text = segment.text
                     yield segment
 
         if buffer:
-            segment = self._transcribe_buffer(
-                model, bytes(buffer), is_partial=False, sample_rate=sample_rate
-            )
-            if segment is not None:
-                yield segment
+            if len(buffer) > last_transcribed_len or not last_yielded_text:
+                segment = self._transcribe_buffer(
+                    model, bytes(buffer), is_partial=False, sample_rate=sample_rate
+                )
+                if segment is not None and segment.text:
+                    yield segment
+            elif last_yielded_text:
+                yield TranscriptionSegment(
+                    text=last_yielded_text,
+                    start_ms=0,
+                    end_ms=int(len(buffer) / bytes_per_second * 1000),
+                    confidence=1.0,
+                    is_partial=False,
+                    language="en",
+                )
 
     def _transcribe_buffer(
         self, model, pcm_bytes: bytes, is_partial: bool, sample_rate: int = 16000
@@ -248,19 +275,35 @@ class WhisperSTT:
                 indices = np.linspace(0, len(audio) - 1, target_len)
                 audio = np.interp(indices, np.arange(len(audio)), audio).astype(np.float32)
 
-        try:
+        def _do_transcribe(m):
             try:
-                raw_segments, info = model.transcribe(audio, word_timestamps=False, language="en")
+                return m.transcribe(
+                    audio,
+                    word_timestamps=False,
+                    language="en",
+                    beam_size=5,
+                    vad_filter=True,
+                    temperature=0.0,
+                    no_speech_threshold=0.6,
+                    condition_on_previous_text=False,
+                    initial_prompt="IELTS speaking test practice interview with clear, natural spoken English.",
+                )
             except TypeError:
-                raw_segments, info = model.transcribe(audio, word_timestamps=False)
+                try:
+                    return m.transcribe(audio, word_timestamps=False, language="en")
+                except TypeError:
+                    return m.transcribe(audio, word_timestamps=False)
+
+        try:
+            raw_segments, info = _do_transcribe(model)
         except Exception as exc:
             logger.warning("Transcription failed (%s). Retrying on CPU.", exc)
             try:
                 from faster_whisper import WhisperModel
-                self._model = WhisperModel(self.model_name, device="cpu", compute_type="int8")
+                self._model = WhisperModel(self.model_name, device="cpu", compute_type="int8", cpu_threads=8)
                 self._loaded_model_name = self.model_name
                 model = self._model
-                raw_segments, info = model.transcribe(audio, word_timestamps=False, language="en")
+                raw_segments, info = _do_transcribe(model)
             except Exception as retry_exc:
                 logger.error("CPU transcription retry failed: %s", retry_exc)
                 return None
