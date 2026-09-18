@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
-from typing import Optional
 
 from app.services.ielts.llm_client import IELTSLLMClient
 
@@ -469,7 +468,7 @@ class IELTSTopicSet:
     part2_cue_card: dict
     part3_questions: list[str]
     target_band: float = 6.5
-    seed: Optional[int] = field(default=None)
+    seed: int | None = field(default=None)
 
 
 class IELTSTopicGenerator:
@@ -480,15 +479,15 @@ class IELTSTopicGenerator:
     follow-ups grounded in what the candidate actually said.
     """
 
-    def __init__(self, llm_client: Optional[IELTSLLMClient] = None):
+    def __init__(self, llm_client: IELTSLLMClient | None = None):
         self.llm_client = llm_client or IELTSLLMClient()
 
     async def generate_session_topics(
         self,
         target_band: float = 6.5,
-        topics_preference: Optional[str] = None,
-        seed: Optional[int] = None,
-        exclude_categories: Optional[list[str]] = None,
+        topics_preference: str | None = None,
+        seed: int | None = None,
+        exclude_categories: list[str] | None = None,
     ) -> IELTSTopicSet:
         rng = random.Random(seed)
         excluded = set(exclude_categories or [])
