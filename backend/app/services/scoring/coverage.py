@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Optional
 
 from app.services.scoring.fusion import QuestionBreakdown
 from app.services.scoring.llm_client import ScoringLLMClient
@@ -35,7 +34,7 @@ COMMON_SKILL_KEYWORDS = [
 class SkillCoverage:
     skill: str
     covered: bool
-    evidence_question: Optional[str] = None
+    evidence_question: str | None = None
     confidence: float = 0.0   # 0-1
 
 
@@ -48,7 +47,7 @@ class CoverageMatrix:
 
 
 class CoverageMatrixBuilder:
-    def __init__(self, llm_client: Optional[ScoringLLMClient] = None):
+    def __init__(self, llm_client: ScoringLLMClient | None = None):
         self.llm_client = llm_client or ScoringLLMClient()
 
     async def build(self, jd_text: str, breakdown: list[QuestionBreakdown]) -> CoverageMatrix:
@@ -86,7 +85,7 @@ class CoverageMatrixBuilder:
         found = [kw for kw in COMMON_SKILL_KEYWORDS if kw in lower]
         return found
 
-    async def _llm_extract(self, jd_text: str) -> Optional[list[str]]:
+    async def _llm_extract(self, jd_text: str) -> list[str] | None:
         result = await self.llm_client._complete_json(  # noqa: SLF001 - internal reuse within the same package
             system="Extract the concrete required skills/technologies/competencies from a job "
             "description. Return 8-15 short skill names, no duplicates.",
@@ -99,7 +98,7 @@ class CoverageMatrixBuilder:
 
     def _find_evidence(
         self, skill: str, breakdown: list[QuestionBreakdown], corpus: str
-    ) -> tuple[Optional[str], float]:
+    ) -> tuple[str | None, float]:
         skill_lower = skill.lower()
         pattern = re.escape(skill_lower)
 
