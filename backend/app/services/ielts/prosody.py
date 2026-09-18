@@ -77,13 +77,19 @@ class ProsodyAnalyzer:
         transcript: str,
         word_timestamps: list[WordTimestamp] | None = None,
     ) -> ProsodyAnalysis:
+        import asyncio
+
         words = re.findall(r"[a-zA-Z']+", transcript.lower())
         word_count = len(words)
 
-        # If the caller (STT service, from Phase 3) didn't supply
-        # timestamps, fabricate evenly-spaced ones from audio duration so
-        # pause detection degrades gracefully instead of crashing.
-        duration_s = self._get_duration_s(audio_path) or max(1.0, word_count / 2.5)
+        # If audio_path is not a valid file on disk, avoid any filesystem/librosa delay
+        audio_exists = bool(audio_path and Path(audio_path).is_file())
+
+        duration_s = None
+        if audio_exists:
+            duration_s = await asyncio.to_thread(self._get_duration_s, audio_path)
+        duration_s = duration_s or max(1.0, word_count / 2.5)
+
         if not word_timestamps:
             word_timestamps = self._even_timestamps(words, duration_s)
 
@@ -94,9 +100,10 @@ class ProsodyAnalyzer:
         filler_words = self._find_fillers(transcript, word_timestamps)
         filler_ratio = len(filler_words) / word_count if word_count else 0.0
 
-        intonation_variety = (
-            self._pitch_variance(audio_path) if _LIBROSA_AVAILABLE else self._synthetic_intonation(transcript)
-        )
+        if audio_exists and _LIBROSA_AVAILABLE:
+            intonation_variety = await asyncio.to_thread(self._pitch_variance, audio_path)
+        else:
+            intonation_variety = self._synthetic_intonation(transcript)
 
         return ProsodyAnalysis(
             speaking_rate_wpm=round(speaking_rate_wpm, 1),
@@ -110,7 +117,7 @@ class ProsodyAnalyzer:
     # -- helpers -------------------------------------------------------------
 
     def _get_duration_s(self, audio_path: Path) -> float | None:
-        if not audio_path or not Path(audio_path).exists():
+        if not audio_path or not Path(audio_path).is_file():
             return None
         if _LIBROSA_AVAILABLE:
             try:
@@ -179,9 +186,12 @@ class ProsodyAnalyzer:
 
     def _pitch_variance(self, audio_path: Path) -> float:
         try:
-            y, sr = librosa.load(str(audio_path), sr=None)
+            # Sample up to 10 seconds at 16kHz for fast and responsive intonation analysis
+            y, sr = librosa.load(str(audio_path), sr=16000, duration=10.0)
+            if len(y) < 1600:
+                return 0.5
             f0, voiced_flag, _ = librosa.pyin(
-                y, fmin=librosa.note_to_hz("C2"), fmax=librosa.note_to_hz("C7")
+                y, fmin=librosa.note_to_hz("C2"), fmax=librosa.note_to_hz("C7"), sr=sr
             )
             voiced = f0[voiced_flag] if voiced_flag is not None else f0[~np.isnan(f0)]
             voiced = voiced[~np.isnan(voiced)]
