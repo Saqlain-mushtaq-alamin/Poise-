@@ -226,19 +226,22 @@ class InterviewPlanner:
         try:
             cleaned_response = extract_json_from_llm(raw_response)
             payload = json.loads(cleaned_response)
-        except json.JSONDecodeError as err:
-            raise PlanGenerationError(f"LLM response was not valid JSON: {err}") from err
+            if not isinstance(payload, dict):
+                raise PlanGenerationError(f"LLM response must be a JSON object")
 
-        payload.setdefault(
-            "estimated_duration_minutes",
-            sum(s.get("time_budget_minutes", 0) for s in payload.get("sections", []))
-            + _WARM_UP_MINUTES
-            + _CLOSING_MINUTES,
-        )
+            sections_raw = payload.get("sections")
+            if not isinstance(sections_raw, list):
+                raise PlanGenerationError(f"LLM response 'sections' field must be a list")
 
-        try:
+            payload.setdefault(
+                "estimated_duration_minutes",
+                sum(s.get("time_budget_minutes", 0) for s in sections_raw if isinstance(s, dict))
+                + _WARM_UP_MINUTES
+                + _CLOSING_MINUTES,
+            )
+
             return InterviewPlan.model_validate(payload)
-        except ValidationError as err:
+        except (ValidationError, TypeError, AttributeError) as err:
             raise PlanGenerationError(
                 f"LLM response didn't match the expected interview plan schema: {err}"
             ) from err
