@@ -12,7 +12,6 @@ judgement and falls back to the heuristic path if that call fails.
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 from app.services.scoring.fusion import AnnotatedAnswer, FrameworkAnalysis, SentenceAnnotation
 from app.services.scoring.llm_client import ScoringLLMClient
@@ -41,10 +40,10 @@ def _split_sentences(text: str) -> list[str]:
 
 
 class AnswerAnnotator:
-    def __init__(self, llm_client: Optional[ScoringLLMClient] = None):
+    def __init__(self, llm_client: ScoringLLMClient | None = None):
         self.llm_client = llm_client or ScoringLLMClient()
 
-    async def annotate(self, answer: str, question: str, criteria: Optional[list[str]] = None) -> AnnotatedAnswer:
+    async def annotate(self, answer: str, question: str, criteria: list[str] | None = None) -> AnnotatedAnswer:
         llm_result = await self.llm_client.annotate_sentences(answer, question)
         if llm_result:
             try:
