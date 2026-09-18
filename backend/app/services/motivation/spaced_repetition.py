@@ -15,7 +15,8 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DBSession
 
-from app.models.motivation import PracticeItem as PracticeItemRow, PracticeItemSource
+from app.models.motivation import PracticeItem as PracticeItemRow
+from app.models.motivation import PracticeItemSource
 from app.schemas.motivation import PracticeItem as PracticeItemSchema
 from app.services.motivation._integration import get_session_weaknesses
 
