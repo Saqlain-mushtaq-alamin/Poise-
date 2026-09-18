@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +40,7 @@ class IELTSLLMClient:
     def is_configured(self) -> bool:
         return self.router is not None
 
-    async def _complete_json(self, system: str, user: str) -> Optional[dict]:
+    async def _complete_json(self, system: str, user: str) -> dict | None:
         if not self.is_configured:
             return None
         try:
@@ -70,7 +69,7 @@ class IELTSLLMClient:
             logger.warning("IELTS LLM call failed, falling back to heuristics: %s", exc)
             return None
 
-    async def _complete_text(self, system: str, user: str) -> Optional[str]:
+    async def _complete_text(self, system: str, user: str) -> str | None:
         if not self.is_configured:
             return None
         try:
@@ -90,7 +89,7 @@ class IELTSLLMClient:
             logger.warning("IELTS LLM call failed, falling back to generic prompt: %s", exc)
             return None
 
-    async def generate_topic_variation(self, theme: str) -> Optional[str]:
+    async def generate_topic_variation(self, theme: str) -> str | None:
         return await self._complete_text(
             system="You write a single, natural IELTS Part 3 discussion question. "
             "Reply with only the question, no preamble.",
@@ -98,7 +97,7 @@ class IELTSLLMClient:
             f"on this theme that isn't a cliché.",
         )
 
-    async def generate_followup(self, answer: str, part: int, theme: str) -> Optional[str]:
+    async def generate_followup(self, answer: str, part: int, theme: str) -> str | None:
         return await self._complete_text(
             system="You are an IELTS examiner. Reply with only the follow-up question.",
             user=f"Part {part}, theme '{theme}'. Candidate answered: \"{answer}\"\n"
@@ -106,7 +105,7 @@ class IELTSLLMClient:
             f"they actually said.",
         )
 
-    async def score_criterion(self, criterion: str, transcript: str, context: str) -> Optional[dict]:
+    async def score_criterion(self, criterion: str, transcript: str, context: str) -> dict | None:
         """Returns dict matching BandDetail fields, or None if unavailable."""
         return await self._complete_json(
             system=SCORING_SYSTEM_PROMPT,
@@ -120,7 +119,7 @@ class IELTSLLMClient:
             ),
         )
 
-    async def score_session_criterion(self, criterion: str, full_transcript: str) -> Optional[dict]:
+    async def score_session_criterion(self, criterion: str, full_transcript: str) -> dict | None:
         """Holistic evaluation across the entire session transcript."""
         return await self._complete_json(
             system=SCORING_SYSTEM_PROMPT,
