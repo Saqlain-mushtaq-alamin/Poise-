@@ -10,7 +10,7 @@ import sqlalchemy as sa
 # TODO: set `down_revision` to whatever your current alembic head is
 # (run `alembic heads` in backend/ to find it) before applying.
 revision = "0010_motivation_engine"
-down_revision = "<SET_TO_YOUR_LATEST_HEAD>"
+down_revision = "af3625856fba"
 branch_labels = None
 depends_on = None
 
