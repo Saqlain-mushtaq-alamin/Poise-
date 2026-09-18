@@ -45,14 +45,27 @@ class IELTSLLMClient:
         if not self.is_configured:
             return None
         try:
-            raw = await self.router.complete(
-                model=self.model,
-                system=system,
-                messages=[{"role": "user", "content": user}],
-                response_format="json",
-                max_tokens=1200,
+            import asyncio
+            messages = [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ]
+            # Use router.chat with a timeout
+            raw = await asyncio.wait_for(
+                self.router.chat(messages=messages, stream=False),
+                timeout=12.0,
             )
-            return json.loads(raw)
+            if not isinstance(raw, str):
+                return None
+            cleaned = raw.strip()
+            if cleaned.startswith("```"):
+                lines = cleaned.splitlines()
+                if lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                cleaned = "\n".join(lines).strip()
+            return json.loads(cleaned)
         except Exception as exc:  # noqa: BLE001 - never let scoring crash a session
             logger.warning("IELTS LLM call failed, falling back to heuristics: %s", exc)
             return None
@@ -61,12 +74,18 @@ class IELTSLLMClient:
         if not self.is_configured:
             return None
         try:
-            return await self.router.complete(
-                model=self.model,
-                system=system,
-                messages=[{"role": "user", "content": user}],
-                max_tokens=200,
+            import asyncio
+            messages = [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ]
+            raw = await asyncio.wait_for(
+                self.router.chat(messages=messages, stream=False),
+                timeout=4.0,
             )
+            if isinstance(raw, str):
+                return raw.strip().strip('"')
+            return None
         except Exception as exc:  # noqa: BLE001
             logger.warning("IELTS LLM call failed, falling back to generic prompt: %s", exc)
             return None
