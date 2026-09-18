@@ -12,10 +12,8 @@ use `model_validate_json` directly).
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
-
 
 # --------------------------------------------------------------------------
 # Enums
@@ -54,7 +52,7 @@ class ApproachAssessment(str, Enum):
 class Example(BaseModel):
     input: str
     output: str
-    explanation: Optional[str] = None
+    explanation: str | None = None
 
 
 class TestCase(BaseModel):
@@ -64,7 +62,7 @@ class TestCase(BaseModel):
 
 
 class CodingProblem(BaseModel):
-    id: Optional[str] = None
+    id: str | None = None
     title: str
     description: str  # Markdown formatted
     examples: list[Example] = Field(default_factory=list)
@@ -77,12 +75,12 @@ class CodingProblem(BaseModel):
 
 
 class ProblemGenerateRequest(BaseModel):
-    session_id: Optional[str] = None
-    jd_id: Optional[str] = None
-    resume_id: Optional[str] = None
+    session_id: str | None = None
+    jd_id: str | None = None
+    resume_id: str | None = None
     difficulty: str = "medium"
     topics: list[str] = Field(default_factory=list)  # optional steer, e.g. ["arrays", "graphs"]
-    language_hint: Optional[Language] = None
+    language_hint: Language | None = None
 
 
 # --------------------------------------------------------------------------
@@ -92,11 +90,11 @@ class ProblemGenerateRequest(BaseModel):
 class CodeSubmission(BaseModel):
     code: str
     language: Language
-    problem_id: Optional[str] = None
+    problem_id: str | None = None
     test_cases: list[TestCase] = Field(default_factory=list)
     time_limit_seconds: int = 10
     memory_limit_mb: int = 256
-    stdin: Optional[str] = None  # for ad-hoc "Run" without test cases
+    stdin: str | None = None  # for ad-hoc "Run" without test cases
 
 
 class TestCaseResult(BaseModel):
@@ -105,8 +103,8 @@ class TestCaseResult(BaseModel):
     actual_output: str
     passed: bool
     is_hidden: bool = False
-    execution_time_ms: Optional[int] = None
-    error: Optional[str] = None
+    execution_time_ms: int | None = None
+    error: str | None = None
 
 
 class ExecutionResult(BaseModel):
@@ -142,7 +140,7 @@ class CodeEvaluateRequest(BaseModel):
     code: str
     language: Language
     problem_id: str
-    execution_result: Optional[ExecutionResult] = None
+    execution_result: ExecutionResult | None = None
 
 
 # --------------------------------------------------------------------------
@@ -158,7 +156,7 @@ class ScreenEvaluation(BaseModel):
 
 class ScreenEvaluateRequest(BaseModel):
     context: str = ""
-    session_id: Optional[str] = None
+    session_id: str | None = None
 
 
 # --------------------------------------------------------------------------
@@ -168,7 +166,7 @@ class ScreenEvaluateRequest(BaseModel):
 class CodingRoundStartRequest(BaseModel):
     difficulty: str = "medium"
     topics: list[str] = Field(default_factory=list)
-    language_hint: Optional[Language] = None
+    language_hint: Language | None = None
 
 
 class CodingRoundStartResponse(BaseModel):
@@ -189,7 +187,7 @@ class CodingRoundCompleteResponse(BaseModel):
 # --------------------------------------------------------------------------
 
 class InterimCodeReviewRequest(BaseModel):
-    session_id: Optional[str] = None
+    session_id: str | None = None
     question: str
     code: str
     language: str = "python"
