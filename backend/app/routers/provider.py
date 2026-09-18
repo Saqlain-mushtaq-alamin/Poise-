@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.orm import Session as DBSession
 
 from app.database import get_db
 from app.models.settings import AppSettings
@@ -18,7 +19,6 @@ from app.routers.hardware import ModelPlanResponse
 from app.services.hardware import detect_hardware
 from app.services.provider import ModelProviderRouter, ProviderError, get_router
 from app.services.tier import HardwareTier
-from sqlalchemy.orm import Session as DBSession
 
 router = APIRouter(prefix="/provider", tags=["provider"])
 
