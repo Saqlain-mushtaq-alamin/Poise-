@@ -227,11 +227,11 @@ class InterviewPlanner:
             cleaned_response = extract_json_from_llm(raw_response)
             payload = json.loads(cleaned_response)
             if not isinstance(payload, dict):
-                raise PlanGenerationError(f"LLM response must be a JSON object")
+                raise PlanGenerationError("LLM response must be a JSON object")
 
             sections_raw = payload.get("sections")
             if not isinstance(sections_raw, list):
-                raise PlanGenerationError(f"LLM response 'sections' field must be a list")
+                raise PlanGenerationError("LLM response 'sections' field must be a list")
 
             payload.setdefault(
                 "estimated_duration_minutes",
