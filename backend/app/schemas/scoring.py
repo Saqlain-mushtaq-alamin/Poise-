@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
-
 
 # -- fused report ------------------------------------------------------------
 
@@ -36,7 +34,7 @@ class SentenceAnnotationOut(BaseModel):
     text: str
     rating: str
     reason: str
-    suggestion: Optional[str] = None
+    suggestion: str | None = None
     highlight_color: str = "gray"
 
 
@@ -60,7 +58,7 @@ class QuestionBreakdownOut(BaseModel):
     user_answer: str
     score: float
     skill_tags: list[str] = []
-    annotated_answer: Optional[AnnotatedAnswerOut] = None
+    annotated_answer: AnnotatedAnswerOut | None = None
 
 
 class CostEstimateOut(BaseModel):
@@ -81,7 +79,7 @@ class FusedReportOut(BaseModel):
     per_question_breakdown: list[QuestionBreakdownOut]
     duration_minutes: float
     generated_at: datetime
-    cost_estimate: Optional[CostEstimateOut] = None
+    cost_estimate: CostEstimateOut | None = None
     persona_label: str = ""
     jd_title: str = ""
 
@@ -94,8 +92,8 @@ class SessionSummaryOut(BaseModel):
     mode: str
     overall_score: float
     duration_minutes: float
-    persona_label: Optional[str] = None
-    jd_title: Optional[str] = None
+    persona_label: str | None = None
+    jd_title: str | None = None
     generated_at: datetime
 
 
@@ -118,7 +116,7 @@ class TrendDataOut(BaseModel):
 class SkillCoverageOut(BaseModel):
     skill: str
     covered: bool
-    evidence_question: Optional[str] = None
+    evidence_question: str | None = None
     confidence: float = 0.0
 
 
