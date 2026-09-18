@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session as DBSession
 
 from app.models.motivation import Goal as GoalRow
 from app.schemas.motivation import Goal as GoalSchema
-from app.services.motivation._integration import ScorePoint, get_recent_score_points
+from app.services.motivation._integration import get_recent_score_points
 
 _MODE_FOR_TYPE = {
     "ielts_band": "ielts",
