@@ -40,7 +40,6 @@ from app.schemas.coding import (
     InterimCodeReviewRequest,
     InterimCodeReviewResponse,
     ProblemGenerateRequest,
-    ScreenEvaluateRequest,
     ScreenEvaluation,
     TestCase,
 )
@@ -256,8 +255,8 @@ Respond with STRICT JSON ONLY:
 }}
 """
     try:
-        from app.services.provider import ModelRole  # noqa: PLC0415
         from app.services.json_utils import extract_json_from_llm  # noqa: PLC0415
+        from app.services.provider import ModelRole  # noqa: PLC0415
 
         response = await provider.chat(
             messages=[
@@ -546,8 +545,11 @@ def _load_session_context(db: DBSession, session_id: str):
     """Pull JD + resume associated with an interview session.
     Returns (jd, resume), either may be None."""
     try:
-        from app.models.interview import InterviewSessionDetail  # noqa: PLC0415
-        from app.models.interview import JobDescriptionRecord, Resume  # noqa: PLC0415
+        from app.models.interview import (  # noqa: PLC0415
+            InterviewSessionDetail,  # noqa: PLC0415
+            JobDescriptionRecord,
+            Resume,
+        )
 
         detail = (
             db.query(InterviewSessionDetail)
