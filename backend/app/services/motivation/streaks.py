@@ -9,9 +9,9 @@ session-completion hook (Phase 4/6/7's "session finished" event) — see
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session as DBSession
 
 from app.models.motivation import PracticeDay
