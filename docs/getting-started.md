@@ -31,16 +31,21 @@ On first launch, the **setup wizard** walks you through:
 
 You can skip any step and finish it later from **Settings → Setup**.
 
-## 4. Choosing a tier
+## 5. Next Steps & Documentation
 
-See [`hardware-guide.md`](./hardware-guide.md) for what each tier means and why a particular one was recommended for your machine.
+- 📖 Detailed feature manual → [`user-guide.md`](./user-guide.md)
+- 🖥️ Hardware tier setup → [`hardware-guide.md`](./hardware-guide.md)
+- 🏛️ Technical Architecture → [`architecture.md`](./architecture.md)
+- 💻 Developer setup & compilation → [`developer-guide.md`](./developer-guide.md)
+- 🔌 API Reference → [`api-reference.md`](./api-reference.md)
+- 🧪 Testing & Quality Control → [`testing-and-qc.md`](./testing-and-qc.md)
 
-## 5. Troubleshooting
+## 6. Troubleshooting
 
 - GPU/driver issues → [`gpu-troubleshooting.md`](./gpu-troubleshooting.md)
 - API key issues → [`api-key-setup.md`](./api-key-setup.md)
 - Everything else → [`faq.md`](./faq.md)
 
-## 6. Updates
+## 7. Updates
 
 Poise checks for updates automatically on launch. When one is found you'll see a banner at the top of the app — click **Download & install**, then **Restart now** when it's ready. Updates are cryptographically signed and verified before install.
