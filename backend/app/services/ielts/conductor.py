@@ -253,12 +253,16 @@ class IELTSSessionConductor:
         return self._current_prompt(row)
 
     async def _generate_followup(self, answer: str, part: int, theme: str) -> str | None:
-        """Generate a contextual follow-up via LLM, with graceful fallback."""
+        """Generate a contextual follow-up via LLM, with graceful fallback and strict timeout."""
+        import asyncio
         try:
-            result = await self.llm_client.generate_followup(answer, part, theme)
+            result = await asyncio.wait_for(
+                self.llm_client.generate_followup(answer, part, theme),
+                timeout=2.5,
+            )
             return result
         except Exception as exc:
-            logger.debug("Follow-up generation failed (offline fallback): %s", exc)
+            logger.debug("Follow-up generation timed out or failed (fallback to curated question): %s", exc)
             return None
 
     def _question_for_state(self, row: IELTSSession, state: IELTSState) -> tuple[int, str]:
