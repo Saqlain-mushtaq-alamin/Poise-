@@ -171,8 +171,8 @@ async def test_generate_plan_raises_clear_error_on_invalid_json():
 @pytest.mark.asyncio
 async def test_generate_plan_raises_clear_error_on_schema_mismatch():
     provider = FakeProvider(
-        json.dumps({"sections": [{"type": "behavioral"}]})
-    )  # missing title/time_budget
+        json.dumps({"sections": "not_a_list"})
+    )
     planner = InterviewPlanner(provider)
     config = InterviewConfig(include_behavioral=True, include_technical=False, include_coding=False)
 
