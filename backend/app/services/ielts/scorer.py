@@ -244,10 +244,15 @@ class IELTSBandEvaluator:
         context: str,
         pronunciation: PronunciationAnalysis | None = None,
         prosody: ProsodyAnalysis | None = None,
+        fast: bool = True,
     ) -> IELTSBandScore:
         fc = self.fc_analyzer.score(transcript, prosody)
-        lr = await self._score_lexical_resource(transcript, context)
-        gra = await self._score_grammar(transcript, context)
+        if fast:
+            lr = self._heuristic_fallback(transcript, "vocabulary range and word choice")
+            gra = self._heuristic_fallback(transcript, "sentence structure and grammatical accuracy")
+        else:
+            lr = await self._score_lexical_resource(transcript, context)
+            gra = await self._score_grammar(transcript, context)
         p = self._score_pronunciation(pronunciation, prosody)
 
         overall = _round_to_half(mean([fc.band, lr.band, gra.band, p.band]))
