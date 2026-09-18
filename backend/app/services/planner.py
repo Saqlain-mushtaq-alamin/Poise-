@@ -241,7 +241,7 @@ class InterviewPlanner:
             )
 
             return InterviewPlan.model_validate(payload)
-        except (ValidationError, TypeError, AttributeError) as err:
+        except (ValidationError, TypeError, AttributeError, json.JSONDecodeError) as err:
             raise PlanGenerationError(
                 f"LLM response didn't match the expected interview plan schema: {err}"
             ) from err
