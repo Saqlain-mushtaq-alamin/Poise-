@@ -8,12 +8,13 @@ result to Tauri's notification plugin.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DBSession
 
-from app.models.motivation import NotificationLog, NotificationSettings as NotificationSettingsRow
+from app.models.motivation import NotificationLog
+from app.models.motivation import NotificationSettings as NotificationSettingsRow
 from app.schemas.motivation import NotificationEvent, NotificationSettings
 from app.services.motivation.goals import GoalTracker
 from app.services.motivation.streaks import StreakTracker
