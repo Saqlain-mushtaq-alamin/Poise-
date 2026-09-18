@@ -299,7 +299,7 @@ class ModelProviderRouter:
 # every request shares the same in-memory key store and token tally.
 # Auto-initialise to the detected hardware tier so first-time users with
 # Ollama running don't need to manually configure anything.
-def _build_default_router() -> "ModelProviderRouter":
+def _build_default_router() -> ModelProviderRouter:
     try:
         from app.services.hardware import detect_hardware
         from app.services.tier import recommend_tier
@@ -317,10 +317,10 @@ def _build_default_router() -> "ModelProviderRouter":
         return ModelProviderRouter()
 
 
-_router_instance: "ModelProviderRouter | None" = None
+_router_instance: ModelProviderRouter | None = None
 
 
-def get_router() -> "ModelProviderRouter":
+def get_router() -> ModelProviderRouter:
     global _router_instance
     if _router_instance is None:
         _router_instance = _build_default_router()
