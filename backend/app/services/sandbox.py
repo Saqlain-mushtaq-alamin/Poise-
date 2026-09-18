@@ -28,13 +28,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+
 try:
     import resource
 except ImportError:
     resource = None
-import shutil
 import signal
-import sys
 import tempfile
 import time
 from pathlib import Path
@@ -47,7 +46,7 @@ from app.schemas.coding import (
     ExecutionStatus,
     TestCaseResult,
 )
-from app.services.language_profiles import LanguageProfile, get_profile
+from app.services.language_profiles import get_profile
 
 logger = logging.getLogger("poise.sandbox")
 
@@ -303,7 +302,7 @@ class CodeSandbox:
         time_limit_s: int,
         memory_limit_mb: int,
         skip_as_limit: bool = False,
-    ) -> "_SubprocessRunResult":
+    ) -> _SubprocessRunResult:
         """Run one command with time/memory limits, no network, minimal env."""
         env = _restricted_env()
         start = time.monotonic()
