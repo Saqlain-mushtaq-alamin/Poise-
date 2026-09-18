@@ -18,7 +18,9 @@ use tauri_plugin_shell::{
 };
 use tokio::time::sleep;
 
-const HEALTH_POLL_INTERVAL: Duration = Duration::from_secs(2);
+const HEALTH_POLL_INTERVAL: Duration = Duration::from_secs(3);
+const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(5);
+const CONSECUTIVE_FAILURE_THRESHOLD: u32 = 3;
 const MAX_RESTART_ATTEMPTS: u32 = 3;
 const SHUTDOWN_GRACE_PERIOD: Duration = Duration::from_secs(3);
 
@@ -181,9 +183,11 @@ fn maybe_restart(app: AppHandle, attempt: u32) {
 async fn health_check_loop(app: AppHandle, port: u16) {
     let manager: State<SidecarManager> = app.state();
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(2))
+        .timeout(HEALTH_CHECK_TIMEOUT)
         .build()
         .expect("failed to build health-check http client");
+
+    let mut consecutive_failures = 0u32;
 
     loop {
         let healthy = client
@@ -193,11 +197,15 @@ async fn health_check_loop(app: AppHandle, port: u16) {
             .map(|resp| resp.status().is_success())
             .unwrap_or(false);
 
-        manager.set_state(if healthy {
-            SidecarState::Healthy
+        if healthy {
+            consecutive_failures = 0;
+            manager.set_state(SidecarState::Healthy);
         } else {
-            SidecarState::Unhealthy
-        });
+            consecutive_failures += 1;
+            if consecutive_failures >= CONSECUTIVE_FAILURE_THRESHOLD {
+                manager.set_state(SidecarState::Unhealthy);
+            }
+        }
 
         let _ = app.emit("sidecar-status", manager.snapshot());
 
