@@ -4,8 +4,9 @@ Revision ID: 0010_motivation_engine
 Revises: <SET_TO_YOUR_LATEST_HEAD>
 Create Date: 2026-07-25
 """
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 # TODO: set `down_revision` to whatever your current alembic head is
 # (run `alembic heads` in backend/ to find it) before applying.
