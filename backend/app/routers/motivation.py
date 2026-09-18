@@ -12,18 +12,16 @@ phase doc) actually happens in one place instead of four.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session as DBSession
 
 from app.database import get_db  # Phase 1
-from app.services.provider import ModelProviderRouter  # Phase 2
-
 from app.schemas.motivation import (
     Achievement,
-    ConfidenceCalibration,
     CoachSummary,
+    ConfidenceCalibration,
     Goal,
     GoalCreate,
     InterviewDayConfig,
@@ -36,7 +34,6 @@ from app.schemas.motivation import (
     ReflectionSubmission,
     ReviewResult,
     StreakData,
-    StreakUpdate,
 )
 from app.services.motivation.achievements import AchievementEngine
 from app.services.motivation.anxiety_toolkit import AnxietyToolkitService
@@ -49,6 +46,7 @@ from app.services.motivation.reflection import SelfReflectionService
 from app.services.motivation.spaced_repetition import SpacedRepetitionScheduler
 from app.services.motivation.streaks import StreakTracker
 from app.services.motivation.suggestions import PracticeSuggestor
+from app.services.provider import ModelProviderRouter  # Phase 2
 
 router = APIRouter(prefix="/motivation", tags=["motivation"])
 
