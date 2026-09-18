@@ -125,20 +125,25 @@ class PronunciationAnalyzer:
         return self._model is not None and _PHONEMIZER_AVAILABLE
 
     async def analyze(self, audio_path: Path, transcript: str) -> PronunciationAnalysis:
-        if not self.is_available:
+        if not audio_path or not Path(audio_path).is_file() or not self.is_available:
             return self._heuristic_fallback(transcript)
 
+        import asyncio
+
         try:
-            predicted_phonemes = self._audio_to_phonemes(audio_path)
-            expected_phonemes = self._text_to_phonemes(transcript)
-            word_scores = self._score_words(transcript, predicted_phonemes, expected_phonemes)
-            overall = mean([ws.score for ws in word_scores]) if word_scores else 0.0
-            return PronunciationAnalysis(
-                word_scores=word_scores,
-                overall_score=overall,
-                problem_sounds=self._identify_problem_sounds(word_scores),
-                engine="wav2vec2",
-            )
+            def _compute():
+                predicted_phonemes = self._audio_to_phonemes(audio_path)
+                expected_phonemes = self._text_to_phonemes(transcript)
+                word_scores = self._score_words(transcript, predicted_phonemes, expected_phonemes)
+                overall = mean([ws.score for ws in word_scores]) if word_scores else 0.0
+                return PronunciationAnalysis(
+                    word_scores=word_scores,
+                    overall_score=overall,
+                    problem_sounds=self._identify_problem_sounds(word_scores),
+                    engine="wav2vec2",
+                )
+
+            return await asyncio.to_thread(_compute)
         except Exception as exc:  # noqa: BLE001 - never fail a session on ML errors
             logger.warning("wav2vec2 pronunciation analysis failed, falling back: %s", exc)
             return self._heuristic_fallback(transcript)
