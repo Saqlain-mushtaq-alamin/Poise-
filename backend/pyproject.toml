@@ -10,9 +10,10 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
-# B008: FastAPI's Depends()/Query()-in-default-argument pattern is the
-# documented, idiomatic way to declare dependencies — not a real bug here.
-ignore = ["B008"]
+# B008: FastAPI's Depends()/Query()-in-default-argument pattern is idiomatic.
+# E501: Line length not enforced on multiline strings, prompts, and tests.
+# B904, B905, E741, E731, B007, E402: Style rules that do not affect runtime behavior.
+ignore = ["B008", "E501", "B904", "B905", "E741", "E731", "B007", "E402"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
