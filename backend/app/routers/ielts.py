@@ -9,13 +9,11 @@ Registered in `app/main.py` alongside the other Phase routers:
 
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session as DBSession
 
 from app.database import get_db
-from app.models.ielts import IELTSAnswer, IELTSSession
+from app.models.ielts import IELTSAnswer
 from app.schemas.ielts import (
     AnswerResultOut,
     CreateIELTSSessionRequest,
@@ -23,8 +21,8 @@ from app.schemas.ielts import (
     IELTSBandScoreOut,
     IELTSSessionDetailOut,
     IELTSSessionOut,
-    ProsodyAnalysisOut,
     PronunciationAnalysisOut,
+    ProsodyAnalysisOut,
     SubmitAnswerRequest,
 )
 from app.services.ielts.conductor import IELTSSessionConductor, IELTSSessionNotFound
