@@ -92,8 +92,9 @@ def get_session_weaknesses(db: DBSession, session_id: str) -> SessionWeaknesses:
     AnswerEvaluation / CodeEvaluation / PronunciationAnalysis rows for
     this session_id. Returning empty lists is a safe no-op default."""
     try:
-        from app.models.report import SessionReport  # type: ignore
         import json
+
+        from app.models.report import SessionReport  # type: ignore
 
         r = db.query(SessionReport).filter(SessionReport.session_id == session_id).first()
         if not r:
