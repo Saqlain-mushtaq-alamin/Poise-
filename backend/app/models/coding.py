@@ -21,12 +21,12 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    JSON,
     Column,
     DateTime,
     Float,
     ForeignKey,
     Integer,
-    JSON,
     String,
     Text,
 )
