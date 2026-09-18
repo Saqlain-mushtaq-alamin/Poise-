@@ -18,8 +18,8 @@ from dataclasses import dataclass, field
 from statistics import mean
 
 from app.services.ielts.llm_client import IELTSLLMClient
-from app.services.ielts.prosody import ProsodyAnalysis
 from app.services.ielts.pronunciation import PronunciationAnalysis
+from app.services.ielts.prosody import ProsodyAnalysis
 
 FILLER_WORDS = {"um", "uh", "erm", "like", "you know", "sort of", "kind of", "basically", "actually"}
 DISCOURSE_MARKERS = {
@@ -47,7 +47,7 @@ class IELTSBandScore:
     overall_band: float
 
     @classmethod
-    def from_dict(cls, data: dict) -> "IELTSBandScore":
+    def from_dict(cls, data: dict) -> IELTSBandScore:
         """Reconstruct from a dict produced by `dataclasses.asdict` (i.e. as
         stored in `IELTSAnswer.band_score` / `IELTSSession.overall_band_score`
         JSON columns) — plain `IELTSBandScore(**data)` would leave the nested
