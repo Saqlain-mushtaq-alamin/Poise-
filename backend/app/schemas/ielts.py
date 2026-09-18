@@ -1,17 +1,15 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
-
 
 # -- requests ----------------------------------------------------------------
 
 
 class CreateIELTSSessionRequest(BaseModel):
     target_band: float = Field(default=6.5, ge=0, le=9)
-    topics_preference: Optional[str] = None
+    topics_preference: str | None = None
 
 
 class SubmitAnswerRequest(BaseModel):
@@ -92,10 +90,10 @@ class CurrentPromptOut(BaseModel):
     """What the UI should render / speak right now."""
 
     state: str
-    part: Optional[int] = None
-    question: Optional[str] = None
-    cue_card: Optional[CueCardOut] = None
-    time_budget_s: Optional[int] = None
+    part: int | None = None
+    question: str | None = None
+    cue_card: CueCardOut | None = None
+    time_budget_s: int | None = None
     is_final: bool = False
 
 
@@ -107,19 +105,19 @@ class IELTSSessionOut(BaseModel):
     session_id: str
     status: str
     target_band: float
-    topics_preference: Optional[str] = None
+    topics_preference: str | None = None
     created_at: datetime
     updated_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class IELTSSessionDetailOut(IELTSSessionOut):
-    current_prompt: Optional[CurrentPromptOut] = None
-    part1_categories: Optional[list[dict]] = None
-    part2_cue_card: Optional[CueCardOut] = None
-    part3_questions: Optional[list[str]] = None
+    current_prompt: CurrentPromptOut | None = None
+    part1_categories: list[dict] | None = None
+    part2_cue_card: CueCardOut | None = None
+    part3_questions: list[str] | None = None
 
 
 class AnswerResultOut(BaseModel):
