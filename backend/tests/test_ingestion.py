@@ -127,8 +127,8 @@ async def test_parse_text_raises_clear_error_on_malformed_llm_json():
 
 @pytest.mark.asyncio
 async def test_parse_text_raises_clear_error_on_schema_mismatch():
-    # Valid JSON, but "experience" entries are missing the required "title" field.
-    payload = {"experience": [{"company": "Acme"}]}
+    # Valid JSON, but "experience" is not a list.
+    payload = {"experience": "not_a_list"}
     provider = FakeProvider(json.dumps(payload))
     parser = ResumeParser(provider=provider)
 
