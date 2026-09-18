@@ -19,7 +19,6 @@ from app.schemas.motivation import (
     InterviewDayReport,
     RoundComparison,
 )
-from app.services.motivation._integration import get_recent_score_points
 
 BREAK_PRESETS = {
     "amazon": {"total_rounds": 5, "break_duration_minutes": 5, "include_lunch_break": True},
@@ -50,7 +49,7 @@ class InterviewDaySimulator:
         return self._to_report(day)
 
     def attach_round_session(self, day_id: str, round_number: int, session_id: str) -> InterviewDayReport:
-        day = self._require(day_id)
+        self._require(day_id)
         row = self.db.execute(
             select(InterviewDayRound)
             .where(InterviewDayRound.day_id == day_id)
