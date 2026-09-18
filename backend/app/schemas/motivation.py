@@ -7,10 +7,9 @@ the spec directly from these models) so other phases' contract stays true.
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------- streaks --
 
@@ -20,7 +19,7 @@ class StreakData(BaseModel):
     total_practice_days: int
     total_sessions: int
     total_practice_hours: float
-    last_practice_date: Optional[date]
+    last_practice_date: date | None
     streak_status: Literal["active", "at_risk", "broken", "none"]
     calendar: dict[str, int] = Field(
         description="ISO date string -> session count, last 90 days, for the heatmap"
@@ -38,7 +37,7 @@ class StreakUpdate(BaseModel):
 class GoalCreate(BaseModel):
     type: Literal["ielts_band", "interview_score", "sessions_per_week"]
     target_value: float
-    deadline: Optional[date] = None
+    deadline: date | None = None
 
 
 class Goal(BaseModel):
@@ -47,11 +46,11 @@ class Goal(BaseModel):
     target_value: float
     current_value: float
     starting_value: float
-    deadline: Optional[date]
+    deadline: date | None
     created_at: datetime
     status: Literal["active", "achieved", "abandoned"]
     progress_percent: float
-    projected_completion: Optional[date]
+    projected_completion: date | None
 
 
 # ----------------------------------------------------- spaced repetition --
@@ -66,7 +65,7 @@ class PracticeItem(BaseModel):
     interval_days: int
     repetitions: int
     next_review_date: date
-    last_score: Optional[float]
+    last_score: float | None
     is_mastered: bool
 
 
@@ -97,7 +96,7 @@ class Achievement(BaseModel):
     desc: str
     category: str
     unlocked: bool
-    unlocked_at: Optional[datetime] = None
+    unlocked_at: datetime | None = None
 
 
 # ------------------------------------------------------------ suggestions --
@@ -107,7 +106,7 @@ class PracticeSuggestion(BaseModel):
     title: str
     reason: str
     priority: Literal["high", "medium", "low"]
-    action: Optional[dict] = Field(
+    action: dict | None = Field(
         default=None, description="e.g. {'practice_item_id': '...'} for deep-linking the CTA"
     )
 
@@ -140,8 +139,8 @@ class ReflectionPrompt(BaseModel):
 
 class ReflectionAnswer(BaseModel):
     prompt_id: str
-    response: Optional[str] = None
-    self_rating: Optional[float] = Field(default=None, ge=1, le=10)
+    response: str | None = None
+    self_rating: float | None = Field(default=None, ge=1, le=10)
 
 
 class ReflectionSubmission(BaseModel):
@@ -172,9 +171,9 @@ class InterviewDayConfig(BaseModel):
 
 class RoundComparison(BaseModel):
     round_number: int
-    confidence_score: Optional[float]
-    quality_score: Optional[float]
-    delta_from_round_1: Optional[float]
+    confidence_score: float | None
+    quality_score: float | None
+    delta_from_round_1: float | None
 
 
 class FatigueAnalysis(BaseModel):
@@ -189,7 +188,7 @@ class InterviewDayReport(BaseModel):
     status: str
     rounds_completed: int
     total_rounds: int
-    fatigue_analysis: Optional[FatigueAnalysis]
+    fatigue_analysis: FatigueAnalysis | None
     overall_verdict: str
-    stamina_score: Optional[float]
+    stamina_score: float | None
     round_comparison: list[RoundComparison]
