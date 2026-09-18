@@ -337,7 +337,6 @@ class WhisperSTT:
                     vad_filter=True,
                     vad_parameters=dict(min_silence_duration_ms=400),
                     condition_on_previous_text=False,
-                    initial_prompt="IELTS speaking test practice interview with clear, natural spoken English.",
                     compression_ratio_threshold=2.4,
                     log_prob_threshold=-1.0,
                     no_speech_threshold=0.6,
