@@ -354,7 +354,7 @@ class InterviewScoreSourceAdapter(ScoreSourceAdapter):
             return 0.0
 
     async def get_persona_and_jd(self, session_id: str) -> tuple[str, str]:
-        if self.db is None:
+        if getattr(self, "db", None) is None:
             return "", ""
         try:
             from app.models.interview import InterviewSessionDetail, JobDescriptionRecord  # noqa: PLC0415
