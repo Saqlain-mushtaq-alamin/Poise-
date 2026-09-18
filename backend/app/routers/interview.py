@@ -26,7 +26,6 @@ from app.models.interview import InterviewSessionDetail, JobDescriptionRecord, Q
 from app.models.session import Session as SessionRecord
 from app.services.company_formats import UnknownCompanyFormatError, list_company_formats
 from app.services.conductor import InterviewConductor
-from app.services.scoring.report_service import ReportService
 from app.services.ingestion import (
     JDParser,
     JobDescription,
@@ -43,6 +42,7 @@ from app.services.planner import (
     PlanGenerationError,
 )
 from app.services.provider import ModelProviderRouter, get_router
+from app.services.scoring.report_service import ReportService
 from app.services.state_machine import InvalidTransitionError, SessionStateMachine
 from app.services.warmup import WarmUpConductor
 
@@ -561,6 +561,7 @@ async def submit_answer(
 def _trigger_report_cache(session_id: str) -> None:
     """Safely spawn a background task to compute & cache the report with its own DB session."""
     import asyncio
+
     from app.database import session_scope
 
     async def _worker():
