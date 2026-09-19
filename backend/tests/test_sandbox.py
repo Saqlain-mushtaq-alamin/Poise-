@@ -9,6 +9,7 @@ These exercise the ALWAYS-AVAILABLE subprocess tier only (no Docker/
 Judge0 dependency), matching the acceptance criterion: "Code executes
 correctly via subprocess fallback (no Docker required)".
 """
+import shutil
 import sys
 
 import pytest
@@ -156,14 +157,23 @@ async def test_filesystem_isolated_between_runs(sandbox):
 
 @pytest.mark.asyncio
 async def test_javascript_execution(sandbox):
-    code = "const data = require('fs').readFileSync(0, 'utf8').trim();\nconsole.log(Number(data) * 2);\n"
+    if not shutil.which("node"):
+        pytest.skip("node not installed in test environment")
+    code = (
+        "let input = '';\n"
+        "process.stdin.setEncoding('utf8');\n"
+        "process.stdin.on('data', (chunk) => { input += chunk; });\n"
+        "process.stdin.on('end', () => {\n"
+        "    console.log(Number(input.trim()) * 2);\n"
+        "});\n"
+    )
     submission = CodeSubmission(
         code=code,
         language=Language.JAVASCRIPT,
         test_cases=[TestCase(input="21", expected_output="42", is_hidden=False)],
     )
     result = await sandbox.execute(submission)
-    # Skip cleanly if node isn't installed in this environment.
-    if result.status == ExecutionStatus.RUNTIME_ERROR and "not available" in result.stderr:
+    # Skip cleanly if node isn't available or fails to run in this environment.
+    if result.status == ExecutionStatus.RUNTIME_ERROR and "not available" in (result.stderr or ""):
         pytest.skip("node not installed in test environment")
-    assert result.status == ExecutionStatus.ACCEPTED
+    assert result.status == ExecutionStatus.ACCEPTED, f"Expected ACCEPTED, got {result.status}. stderr: {result.stderr}"
