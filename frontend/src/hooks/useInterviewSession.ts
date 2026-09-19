@@ -193,7 +193,6 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
     setError(null);
     setBusy(false);
     forceRender((n) => n + 1);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const snapshotValue = actorRef.current.getSnapshot().value;
