@@ -56,6 +56,7 @@ class Example(BaseModel):
 
 
 class TestCase(BaseModel):
+    __test__ = False
     input: str
     expected_output: str
     is_hidden: bool = False

@@ -408,7 +408,17 @@ def _default_single_run(submission: CodeSubmission):
 def _restricted_env() -> dict[str, str]:
     """Minimal environment: no proxies, no host secrets, deterministic locale."""
     allow = {"PATH", "HOME", "LANG", "LC_ALL", "TMPDIR"}
-    env = {k: v for k, v in os.environ.items() if k in allow}
+    if os.name == "nt":
+        allow.update({
+            "SYSTEMROOT",
+            "SYSTEMDRIVE",
+            "PATHEXT",
+            "TEMP",
+            "TMP",
+            "USERPROFILE",
+            "COMSPEC",
+        })
+    env = {k: v for k, v in os.environ.items() if k in allow or k.upper() in allow}
     env.setdefault("LANG", "C.UTF-8")
     # Explicitly strip anything that could leak network config or credentials.
     for blocked in ("HTTP_PROXY", "HTTPS_PROXY", "AWS_", "OPENAI_", "ANTHROPIC_", "GOOGLE_"):
