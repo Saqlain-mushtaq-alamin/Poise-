@@ -1,8 +1,10 @@
 import asyncio
-from app.services.provider import ModelProviderRouter
-from app.services.tier import ModelPlan
+
 from app.services.hardware import detect_hardware
 from app.services.planner import PLAN_GENERATION_PROMPT
+from app.services.provider import ModelProviderRouter
+from app.services.tier import ModelPlan
+
 
 async def main():
     profile = detect_hardware()
