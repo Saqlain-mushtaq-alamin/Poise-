@@ -153,6 +153,7 @@ function UserCamera({ active }: { active: boolean }) {
 
   useEffect(() => {
     if (!active) { setHasStream(false); return; }
+    const videoEl = videoRef.current;
     let stream: MediaStream | null = null;
     navigator.mediaDevices
       .getUserMedia({ video: true, audio: false })
@@ -163,7 +164,7 @@ function UserCamera({ active }: { active: boolean }) {
       .catch(() => setHasStream(false));
     return () => {
       stream?.getTracks().forEach(t => t.stop());
-      if (videoRef.current) videoRef.current.srcObject = null;
+      if (videoEl) videoEl.srcObject = null;
     };
   }, [active]);
 
@@ -554,7 +555,7 @@ export function VideoCallInterviewRoom({
             <div className="vcir__coding-pane-body">
               <CodingRound
                 sessionId={sessionId ?? "demo-session"}
-                codingApi={new CodingAPI(sharedApi as any)}
+                codingApi={new CodingAPI(sharedApi)}
                 questionPrompt={currentMessage ?? undefined}
                 personaId={personaName ? personaName.toLowerCase() : "professional"}
                 onInterimReview={(interviewerMessage) => {
