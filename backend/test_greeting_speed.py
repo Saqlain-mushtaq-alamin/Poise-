@@ -1,10 +1,12 @@
 import asyncio
+
+from app.services.hardware import detect_hardware
+from app.services.ingestion import JobDescription, ResumeData
+from app.services.personas import get_persona
 from app.services.provider import ModelProviderRouter
 from app.services.tier import ModelPlan
-from app.services.hardware import detect_hardware
 from app.services.warmup import WarmUpConductor
-from app.services.personas import get_persona
-from app.services.ingestion import ResumeData, JobDescription
+
 
 async def main():
     profile = detect_hardware()
