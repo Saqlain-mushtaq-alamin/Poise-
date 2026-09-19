@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import datetime, timezone
-from typing import Optional
 
 from sqlalchemy.orm import Session as DBSession
 
@@ -32,7 +31,7 @@ class ReportNotFoundError(Exception):
 
 
 class ReportService:
-    def __init__(self, db: DBSession, fusion_engine: Optional[ScoreFusionEngine] = None):
+    def __init__(self, db: DBSession, fusion_engine: ScoreFusionEngine | None = None):
         self.db = db
         self.fusion_engine = fusion_engine or ScoreFusionEngine(
             interview_adapter=InterviewScoreSourceAdapter(db),
@@ -77,7 +76,7 @@ class ReportService:
         self._save_cache(report)
         return report
 
-    def _get_cache_row(self, session_id: str) -> Optional[SessionReportCache]:
+    def _get_cache_row(self, session_id: str) -> SessionReportCache | None:
         return (
             self.db.query(SessionReportCache)
             .filter(SessionReportCache.session_id == session_id)
@@ -148,8 +147,8 @@ class ReportService:
         or completed status that are missing from cache or have obsolete placeholder 0s.
         """
         try:
-            from app.models.interview import QuestionTurn
             from app.models.ielts import IELTSSession
+            from app.models.interview import QuestionTurn
 
             # Find all interview session IDs with evaluated turns
             interview_sids = [
@@ -194,13 +193,13 @@ class ReportService:
             import logging
             logging.getLogger("poise.scoring").warning("Failed to sync history: %s", exc)
 
-    def list_history(self, mode: Optional[str] = None, limit: int = 50, offset: int = 0) -> list[SessionReportCache]:
+    def list_history(self, mode: str | None = None, limit: int = 50, offset: int = 0) -> list[SessionReportCache]:
         q = self.db.query(SessionReportCache).order_by(SessionReportCache.generated_at.desc())
         if mode:
             q = q.filter(SessionReportCache.mode == mode)
         return q.offset(offset).limit(limit).all()
 
-    def get_trends(self, mode: Optional[str] = None, last_n: int = 20) -> TrendDataOut:
+    def get_trends(self, mode: str | None = None, last_n: int = 20) -> TrendDataOut:
         rows = self.list_history(mode=mode, limit=last_n)
         rows = list(reversed(rows))  # chronological order
 
@@ -233,7 +232,7 @@ class ReportService:
 
     # -- readiness -------------------------------------------------------------
 
-    async def get_readiness(self, mode: Optional[str] = None, target_score: float = 75.0) -> ReadinessVerdict:
+    async def get_readiness(self, mode: str | None = None, target_score: float = 75.0) -> ReadinessVerdict:
         rows = self.list_history(mode=mode, limit=50)
         rows = list(reversed(rows))
         history = [
