@@ -133,6 +133,7 @@ class TTSEngine:
         try:
             import asyncio
             import concurrent.futures
+
             import edge_tts
 
             async def _fetch() -> list[VoiceInfo]:
@@ -155,7 +156,7 @@ class TTSEngine:
                 return res or [_PLACEHOLDER_VOICE]
 
             try:
-                loop = asyncio.get_running_loop()
+                asyncio.get_running_loop()
                 with concurrent.futures.ThreadPoolExecutor() as pool:
                     return pool.submit(lambda: asyncio.run(_fetch())).result(timeout=4)
             except RuntimeError:
