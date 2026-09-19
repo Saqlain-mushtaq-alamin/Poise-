@@ -22,6 +22,7 @@ import { CodingAPI } from '../lib/codingApi';
 import '../components/coding/coding.css';
 import type {
   CodeEvaluation,
+  CodingProblem,
   ExecutionResult,
   Language,
 } from '../../../contracts/types/coding';
@@ -129,7 +130,7 @@ function detectInitialLanguage(prompt?: string): Language {
   return 'python';
 }
 
-function createImmediateProblem(prompt: string, difficulty: string, topics: string[]): any {
+function createImmediateProblem(prompt: string, difficulty: string, topics: string[]): CodingProblem {
   return {
     id: `interview-${Date.now()}`,
     title: 'Live Technical Challenge',
@@ -172,7 +173,7 @@ export function CodingRound({
   const [roundId, setRoundId] = useState<string | null>(() =>
     questionPrompt ? `prompt-${Date.now()}` : null
   );
-  const [problem, setProblem] = useState<any>(() =>
+  const [problem, setProblem] = useState<CodingProblem | null>(() =>
     questionPrompt ? createImmediateProblem(questionPrompt, difficulty, topics) : null
   );
   const [language, setLanguage] = useState<Language>(() => detectInitialLanguage(questionPrompt));
@@ -211,7 +212,7 @@ export function CodingRound({
           if (cancelled) return;
           setRoundId(`local-${Date.now()}`);
           setProblem(fallbackProblem);
-        } catch (e2) {
+        } catch {
           if (!cancelled) setError('Could not load a coding problem. Please retry.');
         }
       }
@@ -233,7 +234,7 @@ export function CodingRound({
         problem_id: problem.id,
       });
       setExecutionResult(result);
-    } catch (e) {
+    } catch {
       setError('Execution failed. Please try again.');
     } finally {
       setIsRunning(false);
@@ -260,7 +261,7 @@ export function CodingRound({
       if (onInterimReview) {
         onInterimReview(res.interviewer_message, res.suggested_improvements || []);
       }
-    } catch (e) {
+    } catch {
       setError('Could not get mid-code review. Continuing...');
     } finally {
       setIsReviewing(false);
@@ -285,7 +286,7 @@ export function CodingRound({
       setExecutionResult(execution);
       await codingApi.evaluate(code, language, problem.id, execution);
       await finalizeRound(code);
-    } catch (e) {
+    } catch {
       // Gracefully submit code to interview even if evaluation fails
       onComplete?.(null, code);
     } finally {
