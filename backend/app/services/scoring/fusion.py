@@ -29,7 +29,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from statistics import mean
-from typing import Optional
 
 from app.services.scoring.llm_client import ScoringLLMClient
 
@@ -74,7 +73,7 @@ class SentenceAnnotation:
     text: str
     rating: str             # "strong" | "adequate" | "weak" | "filler" | "off_topic"
     reason: str
-    suggestion: Optional[str] = None
+    suggestion: str | None = None
     highlight_color: str = "gray"   # green / yellow / red / gray
 
 
@@ -101,7 +100,7 @@ class QuestionBreakdown:
     user_answer: str
     score: float                        # 0-100
     skill_tags: list[str] = field(default_factory=list)
-    annotated_answer: Optional[AnnotatedAnswer] = None
+    annotated_answer: AnnotatedAnswer | None = None
 
 
 @dataclass
@@ -124,7 +123,7 @@ class FusedReport:
     per_question_breakdown: list[QuestionBreakdown]
     duration_minutes: float
     generated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    cost_estimate: Optional[CostEstimate] = None
+    cost_estimate: CostEstimate | None = None
     persona_label: str = ""
     jd_title: str = ""
 
@@ -278,8 +277,9 @@ class InterviewScoreSourceAdapter(ScoreSourceAdapter):
         if self.db is None:
             return []
         try:
-            from app.models.interview import QuestionTurn  # noqa: PLC0415
             import json as _json
+
+            from app.models.interview import QuestionTurn  # noqa: PLC0415
             turns = (
                 self.db.query(QuestionTurn)
                 .filter(QuestionTurn.session_id == session_id)
@@ -357,8 +357,12 @@ class InterviewScoreSourceAdapter(ScoreSourceAdapter):
         if getattr(self, "db", None) is None:
             return "", ""
         try:
-            from app.models.interview import InterviewSessionDetail, JobDescriptionRecord  # noqa: PLC0415
             import json as _json
+
+            from app.models.interview import (  # noqa: PLC0415
+                InterviewSessionDetail,
+                JobDescriptionRecord,
+            )
             detail = (
                 self.db.query(InterviewSessionDetail)
                 .filter(InterviewSessionDetail.session_id == session_id)
@@ -488,9 +492,9 @@ class ScoreFusionEngine:
 
     def __init__(
         self,
-        interview_adapter: Optional[InterviewScoreSourceAdapter] = None,
-        ielts_adapter: Optional[IELTSScoreSourceAdapter] = None,
-        llm_client: Optional[ScoringLLMClient] = None,
+        interview_adapter: InterviewScoreSourceAdapter | None = None,
+        ielts_adapter: IELTSScoreSourceAdapter | None = None,
+        llm_client: ScoringLLMClient | None = None,
     ):
         self.interview_adapter = interview_adapter or InterviewScoreSourceAdapter()
         self.ielts_adapter = ielts_adapter
