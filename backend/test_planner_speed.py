@@ -1,10 +1,11 @@
 import asyncio
-from app.services.provider import ModelProviderRouter
+
 from app.services.hardware import detect_hardware
 from app.services.planner import PLAN_GENERATION_PROMPT
+from app.services.provider import ModelProviderRouter
+
 
 async def main():
-    import app.models.settings
     from app.services.tier import ModelPlan
     
     profile = detect_hardware()
@@ -16,7 +17,6 @@ async def main():
             target_model = m
             break
             
-    from app.services.provider import ModelProviderRouter
     router = ModelProviderRouter()
     router._model_plan = ModelPlan(llm=target_model, stt="", tts="", embedding="", vlm="")
     router.set_model_override(target_model)
