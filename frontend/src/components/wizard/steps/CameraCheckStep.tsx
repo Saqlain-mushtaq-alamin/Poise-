@@ -29,8 +29,9 @@ export function CameraCheckStep({ state: _state, setState, onNext, onSkip }: Ste
   };
 
   useEffect(() => {
+    const videoEl = videoRef.current;
     return () => {
-      const stream = videoRef.current?.srcObject as MediaStream | undefined;
+      const stream = videoEl?.srcObject as MediaStream | undefined;
       stream?.getTracks().forEach((t) => t.stop());
     };
   }, []);
