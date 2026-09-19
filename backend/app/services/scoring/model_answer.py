@@ -15,7 +15,6 @@ from __future__ import annotations
 import difflib
 import re
 from dataclasses import dataclass, field
-from typing import Optional
 
 from app.services.scoring.llm_client import ScoringLLMClient
 
@@ -42,7 +41,7 @@ class AnswerDiff:
 
 
 class ModelAnswerGenerator:
-    def __init__(self, llm_client: Optional[ScoringLLMClient] = None):
+    def __init__(self, llm_client: ScoringLLMClient | None = None):
         self.llm_client = llm_client or ScoringLLMClient()
 
     async def generate(
