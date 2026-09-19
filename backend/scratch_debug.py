@@ -1,7 +1,8 @@
 import asyncio
-import logging
-from app.services.provider import get_router, HardwareTier
+
 from app.services.hardware import detect_hardware
+from app.services.provider import get_router
+
 
 async def main():
     router = get_router()
