@@ -9,7 +9,6 @@ These exercise the ALWAYS-AVAILABLE subprocess tier only (no Docker/
 Judge0 dependency), matching the acceptance criterion: "Code executes
 correctly via subprocess fallback (no Docker required)".
 """
-import asyncio
 import sys
 
 import pytest
