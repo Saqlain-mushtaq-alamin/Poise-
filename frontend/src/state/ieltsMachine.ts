@@ -79,7 +79,7 @@ export const ieltsMachine = setup({
           actions: assign({
             sessionId: ({ event }) => event.output.id,
             // session_id is the parent sessions.id — used by /scoring/report
-            parentSessionId: ({ event }) => (event.output as any).session_id ?? event.output.id,
+            parentSessionId: ({ event }) => event.output.session_id ?? event.output.id,
           }),
         },
         onError: { target: "error", actions: assign({ error: ({ event }) => String(event.error) }) },
