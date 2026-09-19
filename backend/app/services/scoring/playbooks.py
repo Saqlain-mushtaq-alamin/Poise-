@@ -78,7 +78,7 @@ IMPROVEMENT_PLAYBOOKS: dict[str, dict] = {
 }
 
 
-def match_playbooks(report: "FusedReport", coverage_gaps: list[str] | None = None) -> list[dict]:
+def match_playbooks(report: FusedReport, coverage_gaps: list[str] | None = None) -> list[dict]:
     """Returns the playbooks (with their key attached) relevant to this
     specific report — ranked, not exhaustive."""
     matched: list[tuple[str, int]] = []  # (key, priority score, lower = more relevant)
