@@ -148,7 +148,7 @@ class WhisperSTT:
             try:
                 model = WhisperModel(candidate_name, device="cpu", compute_type="int8", cpu_threads=8)
                 break
-            except Exception as cpu_err:
+            except Exception:
                 try:
                     model = WhisperModel(candidate_name, device="cpu", compute_type="auto", cpu_threads=8)
                     break
