@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from statistics import mean, pstdev
-from typing import Optional
 
 from app.services.scoring.llm_client import ScoringLLMClient
 
@@ -37,7 +36,7 @@ class ReadinessVerdict:
 
 
 class ReadinessAssessor:
-    def __init__(self, llm_client: Optional[ScoringLLMClient] = None):
+    def __init__(self, llm_client: ScoringLLMClient | None = None):
         self.llm_client = llm_client or ScoringLLMClient()
 
     async def assess(
@@ -112,5 +111,5 @@ class ReadinessAssessor:
             return "Recent scores are trending down — consider a short break, then a focused practice session."
         return "Keep practicing with attention to your lowest-scoring dimension before scheduling the real thing."
 
-    async def _recommendation(self, verdict: str, evidence: list[str]) -> Optional[str]:
+    async def _recommendation(self, verdict: str, evidence: list[str]) -> str | None:
         return await self.llm_client.readiness_recommendation("\n".join(evidence) + f"\nVerdict: {verdict}")
