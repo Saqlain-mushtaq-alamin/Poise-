@@ -12,7 +12,6 @@ from __future__ import annotations
 import json
 import logging
 from enum import Enum
-from typing import Optional
 
 from app.services.json_utils import extract_json_from_llm
 
@@ -42,7 +41,7 @@ class ScoringLLMClient:
 
     async def _complete_text(
         self, system: str, user: str, model_role: ModelRole = ModelRole.REASONING, max_tokens: int = 500
-    ) -> Optional[str]:
+    ) -> str | None:
         if not self.is_configured:
             return None
         try:
@@ -54,7 +53,7 @@ class ScoringLLMClient:
             logger.warning("Scoring LLM call failed, falling back to heuristics: %s", exc)
             return None
 
-    async def _complete_json(self, system: str, user: str, max_tokens: int = 1200) -> Optional[dict]:
+    async def _complete_json(self, system: str, user: str, max_tokens: int = 1200) -> dict | None:
         if not self.is_configured:
             return None
         try:
@@ -70,7 +69,7 @@ class ScoringLLMClient:
 
     # -- debrief --------------------------------------------------------------
 
-    async def debrief_opening(self, report_summary: str) -> Optional[str]:
+    async def debrief_opening(self, report_summary: str) -> str | None:
         return await self._complete_text(
             system=(
                 "You are a warm, direct interview coach debriefing a candidate right after "
@@ -80,7 +79,7 @@ class ScoringLLMClient:
             user=f"Session report summary:\n{report_summary}\n\nOpen the debrief conversation.",
         )
 
-    async def debrief_reply(self, report_summary: str, history: list[dict], user_message: str) -> Optional[str]:
+    async def debrief_reply(self, report_summary: str, history: list[dict], user_message: str) -> str | None:
         transcript = "\n".join(f"{m['role']}: {m['content']}" for m in history[-8:])
         return await self._complete_text(
             system=(
@@ -93,7 +92,7 @@ class ScoringLLMClient:
 
     # -- sentence annotation ---------------------------------------------------
 
-    async def annotate_sentences(self, answer: str, question: str) -> Optional[dict]:
+    async def annotate_sentences(self, answer: str, question: str) -> dict | None:
         return await self._complete_json(
             system=(
                 "You are an interview coach annotating a candidate's answer sentence by "
@@ -110,7 +109,7 @@ class ScoringLLMClient:
 
     # -- model answers ----------------------------------------------------------
 
-    async def generate_model_answer(self, question: str, jd_summary: str, resume_summary: str) -> Optional[dict]:
+    async def generate_model_answer(self, question: str, jd_summary: str, resume_summary: str) -> dict | None:
         return await self._complete_json(
             system=(
                 "You write strong interview answers GROUNDED IN THE CANDIDATE'S OWN "
@@ -128,7 +127,7 @@ class ScoringLLMClient:
 
     # -- readiness recommendation -------------------------------------------------
 
-    async def readiness_recommendation(self, evidence_summary: str) -> Optional[str]:
+    async def readiness_recommendation(self, evidence_summary: str) -> str | None:
         return await self._complete_text(
             system="You give one concise, specific, prioritized recommendation sentence.",
             user=f"Evidence:\n{evidence_summary}\n\nWhat should this candidate focus on next?",
