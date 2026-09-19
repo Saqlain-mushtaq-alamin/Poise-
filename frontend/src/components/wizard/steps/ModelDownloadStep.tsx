@@ -23,13 +23,12 @@ function useModelDownloadProgress(tier: string | null, enabled: boolean) {
   useEffect(() => {
     if (!enabled || !tier) return;
     let cancelled = false;
-    let interval: ReturnType<typeof setInterval>;
 
     invokeSidecar("POST", "/models/download/start", { tier }).catch((err) => {
       if (!cancelled) setError(err instanceof Error ? err.message : "Failed to start download");
     });
 
-    interval = setInterval(async () => {
+    const interval = setInterval(async () => {
       try {
         const status = await invokeSidecar<ModelProgress[]>("GET", "/models/download/status");
         if (!cancelled) setModels(status);
