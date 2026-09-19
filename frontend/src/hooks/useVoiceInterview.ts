@@ -616,7 +616,6 @@ export function useVoiceInterview({
     micCtxRef.current?.close().catch(() => {});
     micCtxRef.current = null;
     if (phaseRef.current === "listening") setPhase("idle");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const clearTranscript = useCallback(() => {
