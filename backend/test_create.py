@@ -1,6 +1,8 @@
 import asyncio
+
 from app.database import SessionLocal
 from app.services.ielts.conductor import IELTSSessionConductor
+
 
 async def main():
     db = SessionLocal()
@@ -8,7 +10,7 @@ async def main():
     try:
         session = await conductor.create_session(target_band=6.5)
         print("Success:", session.id)
-    except Exception as e:
+    except Exception:
         import traceback
         traceback.print_exc()
     finally:
