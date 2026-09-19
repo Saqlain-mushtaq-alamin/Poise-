@@ -6,8 +6,6 @@ conversation survives a page refresh.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from sqlalchemy.orm import Session as DBSession
 
 from app.models.scoring import DebriefMessage
@@ -30,7 +28,7 @@ def _summarize_report(report: FusedReport) -> str:
 
 
 class DebriefService:
-    def __init__(self, db: DBSession, llm_client: Optional[ScoringLLMClient] = None):
+    def __init__(self, db: DBSession, llm_client: ScoringLLMClient | None = None):
         self.db = db
         self.llm_client = llm_client or ScoringLLMClient()
 
