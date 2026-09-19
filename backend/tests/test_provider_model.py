@@ -1,7 +1,6 @@
-import pytest
-from app.services.tier import HardwareTier
 from app.services.provider import ModelProviderRouter
-from app.services.hardware import HardwareProfile, GPUInfo
+from app.services.tier import HardwareTier
+
 
 def test_model_override():
     router = ModelProviderRouter(tier=HardwareTier.LOCAL_FULL)
