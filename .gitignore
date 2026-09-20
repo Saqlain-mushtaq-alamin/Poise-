@@ -33,8 +33,6 @@ e2e/playwright-report/
 coverage/
 
 
-src-tauri/icons/
-planning 
-
+planning/
 
 fallback_error.txt
