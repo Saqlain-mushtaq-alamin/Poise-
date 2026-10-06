@@ -124,8 +124,17 @@ class PronunciationAnalyzer:
     def is_available(self) -> bool:
         return self._model is not None and _PHONEMIZER_AVAILABLE
 
-    async def analyze(self, audio_path: Path, transcript: str) -> PronunciationAnalysis:
-        if not audio_path or not Path(audio_path).is_file() or not self.is_available:
+    async def analyze(
+        self, audio_path: Path | str | None, transcript: str
+    ) -> PronunciationAnalysis:
+        audio_exists = False
+        if audio_path:
+            try:
+                audio_exists = bool(str(audio_path).strip() and Path(audio_path).is_file())
+            except Exception:
+                audio_exists = False
+
+        if not audio_exists or not self.is_available:
             return self._heuristic_fallback(transcript)
 
         import asyncio
