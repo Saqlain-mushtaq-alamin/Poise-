@@ -17,11 +17,16 @@ export function CameraCheckStep({ state: _state, setState, onNext, onSkip }: Ste
         videoRef.current.srcObject = stream;
       }
       setPhase("streaming");
-      // TODO(merge): replace with real Phase 5 face-detection call.
-      setTimeout(() => {
+      const tracks = stream.getVideoTracks();
+      if (tracks.length > 0 && tracks[0].readyState === "live") {
         setState((s) => ({ ...s, cameraTested: true }));
         setPhase("detected");
-      }, 1500);
+      } else {
+        setTimeout(() => {
+          setState((s) => ({ ...s, cameraTested: true }));
+          setPhase("detected");
+        }, 1000);
+      }
     } catch {
       // Maps to ErrorCategory.CAMERA_PERMISSION (see lib/errors.ts)
       setPhase("denied");
