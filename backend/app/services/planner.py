@@ -12,6 +12,7 @@ ingestion.py.
 from __future__ import annotations
 
 import json
+import logging
 
 from pydantic import BaseModel, ValidationError
 
@@ -19,6 +20,8 @@ from app.services.company_formats import get_company_format
 from app.services.ingestion import JobDescription, ResumeData
 from app.services.json_utils import extract_json_from_llm
 from app.services.provider import ModelProviderRouter, ModelRole
+
+logger = logging.getLogger("poise.planner")
 
 
 class InterviewConfig(BaseModel):
@@ -216,11 +219,7 @@ class InterviewPlanner:
         except PlanGenerationError:
             raise
         except Exception as err:
-            import logging
-            logging.getLogger(__name__).warning("LLM plan generation failed (%s); generating fallback plan", err)
-            with open("D:\\canvas\\Poise-\\fallback_error.txt", "w") as f:
-                import traceback
-                f.write(traceback.format_exc())
+            logger.exception("LLM plan generation failed (%s); generating fallback plan", err)
             return self._generate_fallback_plan(resume, jd, config, section_budgets)
 
         try:
