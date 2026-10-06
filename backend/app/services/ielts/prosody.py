@@ -73,7 +73,7 @@ class ProsodyAnalysis:
 class ProsodyAnalyzer:
     async def analyze(
         self,
-        audio_path: Path,
+        audio_path: Path | str | None,
         transcript: str,
         word_timestamps: list[WordTimestamp] | None = None,
     ) -> ProsodyAnalysis:
@@ -83,7 +83,12 @@ class ProsodyAnalyzer:
         word_count = len(words)
 
         # If audio_path is not a valid file on disk, avoid any filesystem/librosa delay
-        audio_exists = bool(audio_path and Path(audio_path).is_file())
+        audio_exists = False
+        if audio_path:
+            try:
+                audio_exists = bool(str(audio_path).strip() and Path(audio_path).is_file())
+            except Exception:
+                audio_exists = False
 
         duration_s = None
         if audio_exists:
