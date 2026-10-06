@@ -12,9 +12,13 @@ from app.config import get_settings
 
 settings = get_settings()
 
+connect_args = {}
+if "sqlite" in settings.database_url:
+    connect_args = {"check_same_thread": False, "timeout": 15}
+
 engine = create_engine(
     settings.database_url,
-    connect_args={"check_same_thread": False, "timeout": 15},
+    connect_args=connect_args,
     pool_pre_ping=True,
 )
 
