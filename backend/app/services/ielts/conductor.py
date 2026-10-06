@@ -177,8 +177,9 @@ class IELTSSessionConductor:
 
         part, question_text = self._question_for_state(row, machine.state)
 
-        prosody = await self.prosody_analyzer.analyze(Path(audio_path), transcript)
-        pronunciation = await self.pronunciation_analyzer.analyze(Path(audio_path), transcript)
+        audio_path_obj = Path(audio_path) if audio_path and str(audio_path).strip() else None
+        prosody = await self.prosody_analyzer.analyze(audio_path_obj, transcript)
+        pronunciation = await self.pronunciation_analyzer.analyze(audio_path_obj, transcript)
         band_score = await self.evaluator.score_response(
             transcript=transcript,
             context=f"IELTS Part {part}: {question_text}",
