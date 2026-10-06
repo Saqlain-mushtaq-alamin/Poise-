@@ -59,7 +59,7 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
     (text: string) => {
       send({
         type: "ANSWER_SUBMITTED",
-        audioPath: "/tmp/dummy.wav",
+        audioPath: "",
         transcript: text,
       });
     },
