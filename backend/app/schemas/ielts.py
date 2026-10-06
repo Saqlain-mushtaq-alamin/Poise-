@@ -13,7 +13,7 @@ class CreateIELTSSessionRequest(BaseModel):
 
 
 class SubmitAnswerRequest(BaseModel):
-    audio_path: str
+    audio_path: str = ""
     transcript: str
 
 
