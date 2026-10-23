@@ -106,6 +106,14 @@ export function useVoiceInterview({
   const sttSocketRef = useRef<VoiceSocket | null>(null);
   const processorNodeRef = useRef<ScriptProcessorNode | null>(null);
 
+  const activeSilenceThresholdRef = useRef(silenceThresholdSecs);
+  const activeMaxListenSecsRef = useRef(maxListenSecs);
+  useEffect(() => { activeSilenceThresholdRef.current = silenceThresholdSecs; }, [silenceThresholdSecs]);
+  useEffect(() => { activeMaxListenSecsRef.current = maxListenSecs; }, [maxListenSecs]);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+
   // keep refs in sync
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
