@@ -77,7 +77,7 @@ async def synthesize(
         # Use synthesize_complete for a single clean audio blob
         audio_bytes = await tts.synthesize_complete(body.text, voice=body.voice)
         # Edge TTS returns MP3; placeholder returns WAV — detect by magic bytes
-        is_mp3 = audio_bytes[:3] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2", b"ID3")
+        is_mp3 = audio_bytes.startswith((b"\xff\xfb", b"\xff\xf3", b"\xff\xf2", b"ID3"))
         media_type = "audio/mpeg" if is_mp3 else "audio/wav"
 
         async def complete_body():
