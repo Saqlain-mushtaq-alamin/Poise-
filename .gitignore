@@ -17,6 +17,8 @@ backend/build/
 # Data / DB
 *.db
 *.db-journal
+audio_uploads/
+**/audio_uploads/
 
 # Env
 .env
