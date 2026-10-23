@@ -6,7 +6,10 @@
 //!   - `GET /health` on that port returns `{"status": "ok", ...}` once ready.
 
 use std::{
-    sync::Mutex,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Mutex,
+    },
     time::{Duration, Instant},
 };
 
@@ -48,6 +51,7 @@ pub struct SidecarManager {
     /// The live child process handle, so `shutdown()` can send SIGTERM/kill
     /// it on app close. `None` before the first successful spawn.
     child: Mutex<Option<CommandChild>>,
+    shutting_down: AtomicBool,
 }
 
 impl Default for SidecarManager {
@@ -61,6 +65,7 @@ impl Default for SidecarManager {
             }),
             started_at: Mutex::new(None),
             child: Mutex::new(None),
+            shutting_down: AtomicBool::new(false),
         }
     }
 }
@@ -72,6 +77,14 @@ impl SidecarManager {
             status.uptime_seconds = started_at.elapsed().as_secs_f64();
         }
         status
+    }
+
+    pub fn is_shutting_down(&self) -> bool {
+        self.shutting_down.load(Ordering::SeqCst)
+    }
+
+    pub fn set_shutting_down(&self) {
+        self.shutting_down.store(true, Ordering::SeqCst);
     }
 
     fn set_port(&self, port: u16) {
