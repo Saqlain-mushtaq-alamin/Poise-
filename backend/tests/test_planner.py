@@ -210,3 +210,101 @@ async def test_generate_plan_includes_company_format_context_when_specified():
 
     prompt_text = provider.last_messages[0]["content"]
     assert "Leadership Principles" in prompt_text
+
+
+@pytest.mark.asyncio
+async def test_generate_plan_with_thinking_model_tags_extracts_cleanly():
+    """Verify that models emitting <think>...</think> tags parse successfully."""
+    plan_json = {
+        "sections": [
+            {
+                "type": "behavioral",
+                "title": "Behavioral Round",
+                "time_budget_minutes": 15,
+                "questions": [
+                    {
+                        "id": "q1",
+                        "text": "Tell me about leading the migrations at Acme.",
+                        "evaluation_criteria": ["Leadership"],
+                        "skills_tested": ["Python"],
+                        "source": "resume_gap",
+                    }
+                ],
+            }
+        ],
+        "coverage_matrix": {"Python": ["q1"]},
+    }
+    raw_with_think = f"""<think>
+We need to generate a valid plan for Jane Doe.
+Let me check the JD: Senior Backend Engineer.
+{{ "internal_notes": "skip this brace" }}
+</think>
+```json
+{json.dumps(plan_json)}
+```"""
+    provider = FakeProvider(raw_with_think)
+    planner = InterviewPlanner(provider)
+    config = InterviewConfig(include_behavioral=True, include_technical=False, include_coding=False)
+
+    plan = await planner.generate_plan(_resume(), _jd(), config)
+    assert plan.is_personalized is True
+    assert plan.sections[0].questions[0].text == "Tell me about leading the migrations at Acme."
+
+
+@pytest.mark.asyncio
+async def test_generate_plan_fallback_contains_warning_and_not_personalized():
+    """When the LLM fails completely, the fallback plan must flag is_personalized=False and include a warning."""
+    class FailingProvider:
+        async def chat(self, *args, **kwargs):
+            raise RuntimeError("Connection refused")
+
+    planner = InterviewPlanner(FailingProvider())
+    config = InterviewConfig(include_behavioral=True, include_technical=True, include_coding=False)
+
+    plan = await planner.generate_plan(_resume(), _jd(), config)
+    assert plan.is_personalized is False
+    assert plan.warning is not None
+    assert "Could not personalize" in plan.warning
+    assert len(plan.sections) == 2
+
+
+@pytest.mark.asyncio
+async def test_generate_plan_recovers_via_json_repair():
+    """When the first response has invalid JSON syntax, repair prompt fixes it."""
+    valid_plan = {
+        "sections": [
+            {
+                "type": "technical",
+                "title": "Technical",
+                "time_budget_minutes": 20,
+                "questions": [
+                    {
+                        "id": "q1",
+                        "text": "How do you optimize PostgreSQL queries?",
+                        "evaluation_criteria": ["Indexing"],
+                        "skills_tested": ["PostgreSQL"],
+                        "source": "jd_requirement",
+                    }
+                ],
+            }
+        ],
+        "coverage_matrix": {"PostgreSQL": ["q1"]},
+    }
+    # First response has a broken JSON with unmatched brace
+    class RepairingProvider:
+        def __init__(self):
+            self.call_count = 0
+
+        async def chat(self, *args, **kwargs):
+            self.call_count += 1
+            if self.call_count == 1:
+                return '{"sections": [{"type": "technical", "title": "Technical"'  # unclosed
+            return json.dumps(valid_plan)
+
+    planner = InterviewPlanner(RepairingProvider())
+    config = InterviewConfig(include_behavioral=False, include_technical=True, include_coding=False)
+
+    plan = await planner.generate_plan(_resume(), _jd(), config)
+    assert plan.is_personalized is True
+    assert plan.sections[0].questions[0].text == "How do you optimize PostgreSQL queries?"
+
