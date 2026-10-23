@@ -488,9 +488,11 @@ class IELTSTopicGenerator:
         topics_preference: str | None = None,
         seed: int | None = None,
         exclude_categories: list[str] | None = None,
+        exclude_cue_cards: list[str] | None = None,
     ) -> IELTSTopicSet:
         rng = random.Random(seed)
         excluded = set(exclude_categories or [])
+        excluded_cards = set(exclude_cue_cards or [])
 
         part1_pool = PART1_TOPICS
         if topics_preference:
@@ -515,7 +517,13 @@ class IELTSTopicGenerator:
         if topics_preference:
             filtered_cards = [c for c in PART2_CUE_CARDS if topics_preference.lower() in c["theme"]]
             cue_card_pool = filtered_cards or PART2_CUE_CARDS
-        cue_card = rng.choice(cue_card_pool)
+
+        # Filter out recently used cue cards to guarantee variety across sessions
+        fresh_cards = [
+            c for c in cue_card_pool
+            if c.get("id") not in excluded_cards and c.get("topic") not in excluded_cards
+        ]
+        cue_card = rng.choice(fresh_cards or cue_card_pool)
 
         # Part 3 is thematically linked to the Part 2 cue card, as in the
         # real test — the examiner "widens out" from the long-turn topic.
