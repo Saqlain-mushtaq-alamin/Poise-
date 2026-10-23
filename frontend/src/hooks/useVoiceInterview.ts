@@ -302,30 +302,72 @@ export function useVoiceInterview({
     if (maxListenTimerRef.current) { clearTimeout(maxListenTimerRef.current); maxListenTimerRef.current = null; }
   }
 
-  function submitCurrentTranscript() {
+  async function submitCurrentTranscript() {
     clearAllTimers();
-    const txt = (transcriptRef.current + " " + (interimTranscriptRef.current || "")).trim();
-    // Require at least 3 words to avoid false silence-detection triggers while allowing natural concise answers
-    const wordCount = txt ? txt.split(/\s+/).filter(Boolean).length : 0;
-    if (txt && wordCount >= 3 && phaseRef.current === "listening") {
-      setPhase("processing");
-      onAnswerReady(txt);
-    } else if (txt && wordCount < 3) {
-      // Too short — reset and keep listening
-      lastActivityRef.current = Date.now();
-      resetSilenceTimer();
+    const liveTxt = (transcriptRef.current + " " + (interimTranscriptRef.current || "")).trim();
+    if (!liveTxt && phaseRef.current !== "listening") return;
+
+    setPhase("processing");
+
+    // Stop MediaRecorder and collect full recorded audio
+    let audioBlob: Blob | null = null;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      try {
+        await new Promise<void>((resolve) => {
+          if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") {
+            return resolve();
+          }
+          mediaRecorderRef.current.onstop = () => resolve();
+          mediaRecorderRef.current.stop();
+        });
+      } catch { /* ok */ }
     }
+    if (recordedChunksRef.current.length > 0) {
+      const mime = mediaRecorderRef.current?.mimeType || "audio/webm";
+      audioBlob = new Blob(recordedChunksRef.current, { type: mime });
+    }
+
+    let finalTranscript = liveTxt;
+    let audioPath = "";
+
+    // Two-pass STT: Send full recorded audio to backend for high-accuracy Whisper transcription
+    if (audioBlob && audioBlob.size > 0 && backendBaseUrl) {
+      try {
+        const formData = new FormData();
+        const ext = audioBlob.type.includes("ogg") ? "ogg" : audioBlob.type.includes("wav") ? "wav" : "webm";
+        formData.append("audio", audioBlob, `recording.${ext}`);
+        formData.append("initial_prompt", "Um, uh, well, so, like, you know, actually, I think that...");
+
+        const resp = await fetch(`${backendBaseUrl}/voice/transcribe-full`, {
+          method: "POST",
+          body: formData,
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.audio_path) {
+            audioPath = data.audio_path;
+          }
+          if (data.transcript && data.transcript.trim()) {
+            finalTranscript = data.transcript.trim();
+          }
+        }
+      } catch (uploadErr) {
+        console.warn("[useVoiceInterview] transcribe-full error, using streaming transcript:", uploadErr);
+      }
+    }
+
+    onAnswerReady(finalTranscript, audioPath);
   }
 
   function resetSilenceTimer() {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     lastActivityRef.current = Date.now();
     silenceTimerRef.current = setTimeout(() => {
-      const txt = transcriptRef.current.trim();
+      const txt = (transcriptRef.current + " " + (interimTranscriptRef.current || "")).trim();
       if (txt && phaseRef.current === "listening") {
         submitCurrentTranscript();
       }
-    }, silenceThresholdSecs * 1000);
+    }, activeSilenceThresholdRef.current * 1000);
   }
 
   function startSilenceInterval() {
@@ -335,7 +377,8 @@ export function useVoiceInterview({
     silenceIntervalRef.current = setInterval(() => {
       if (phaseRef.current !== "listening") { clearInterval(silenceIntervalRef.current!); return; }
       const sinceLast = Date.now() - lastActivityRef.current;
-      if (sinceLast >= silenceThresholdSecs * 1000 && transcriptRef.current.trim()) {
+      const txt = (transcriptRef.current + " " + (interimTranscriptRef.current || "")).trim();
+      if (sinceLast >= activeSilenceThresholdRef.current * 1000 && txt) {
         submitCurrentTranscript();
       }
     }, 500);
@@ -346,10 +389,14 @@ export function useVoiceInterview({
     listenStartedAtRef.current = Date.now();
     maxListenTimerRef.current = setTimeout(() => {
       if (phaseRef.current !== "listening") return;
-      const txt = transcriptRef.current.trim() || "[no response — please continue]";
-      setPhase("processing");
-      onAnswerReady(txt);
-    }, maxListenSecs * 1000);
+      const txt = (transcriptRef.current + " " + (interimTranscriptRef.current || "")).trim();
+      if (txt) {
+        submitCurrentTranscript();
+      } else {
+        setPhase("processing");
+        onAnswerReady("", "");
+      }
+    }, activeMaxListenSecsRef.current * 1000);
   }
 
   // ---- Mic level polling ----
