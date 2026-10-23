@@ -224,9 +224,31 @@ class InterviewPlanner:
             logger.exception("LLM plan generation failed (%s); generating fallback plan", err)
             return self._generate_fallback_plan(resume, jd, config, section_budgets)
 
+        payload = None
+        cleaned_response = extract_json_from_llm(raw_response)
         try:
-            cleaned_response = extract_json_from_llm(raw_response)
             payload = json.loads(cleaned_response)
+        except (json.JSONDecodeError, ValueError) as json_err:
+            logger.warning("Initial JSON parse failed (%s); attempting LLM repair prompt", json_err)
+            try:
+                repair_prompt = (
+                    "Fix any JSON syntax errors in the following snippet. Output ONLY valid JSON matching the interview plan schema:\n"
+                    f"```json\n{cleaned_response[:1500]}\n```"
+                )
+                repaired_raw = await self.provider.chat(
+                    messages=[{"role": "user", "content": repair_prompt}],
+                    model_role=ModelRole.REASONING,
+                    stream=False,
+                    response_format={"type": "json_object"},
+                    max_tokens=2500,
+                )
+                payload = json.loads(extract_json_from_llm(repaired_raw))
+            except Exception as repair_err:
+                raise PlanGenerationError(
+                    f"LLM response didn't match the expected interview plan schema: {json_err}"
+                ) from repair_err
+
+        try:
             if not isinstance(payload, dict):
                 raise PlanGenerationError("LLM response must be a JSON object")
 
@@ -241,8 +263,10 @@ class InterviewPlanner:
                 + _CLOSING_MINUTES,
             )
 
-            return InterviewPlan.model_validate(payload)
-        except (ValidationError, TypeError, AttributeError, json.JSONDecodeError) as err:
+            plan = InterviewPlan.model_validate(payload)
+            plan.is_personalized = True
+            return plan
+        except (ValidationError, TypeError, AttributeError) as err:
             raise PlanGenerationError(
                 f"LLM response didn't match the expected interview plan schema: {err}"
             ) from err
@@ -322,4 +346,6 @@ class InterviewPlanner:
             sections=sections,
             estimated_duration_minutes=config.duration_minutes,
             coverage_matrix={"General": [f"q{i}" for i in range(1, q_idx)]},
+            is_personalized=False,
+            warning="Could not personalize interview questions using AI; loaded generic structured questions instead.",
         )
