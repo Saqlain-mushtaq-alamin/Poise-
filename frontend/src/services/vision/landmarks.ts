@@ -37,8 +37,9 @@ export const FACE = {
   LEFT_EYEBROW_INNER: 55,
   RIGHT_EYEBROW_INNER: 285,
   // Iris centers, present only when Face Mesh is run with refineLandmarks.
-  LEFT_IRIS_CENTER: 468,
-  RIGHT_IRIS_CENTER: 473,
+  // In MediaPipe Face Mesh topology: 468 is the right eye iris center, 473 is the left eye iris center.
+  RIGHT_IRIS_CENTER: 468,
+  LEFT_IRIS_CENTER: 473,
 } as const;
 
 // Six-point EAR landmark sets (Soukupová & Čech, 2016): [corner, top1, top2,
