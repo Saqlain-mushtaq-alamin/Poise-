@@ -83,6 +83,8 @@ class Transcription:
 
 
 class WhisperSTT:
+    _cuda_available: bool | None = None
+
     def __init__(self, tier: HardwareTier = HardwareTier.LOCAL_LITE) -> None:
         self._tier = tier
         self._model = None
@@ -100,7 +102,7 @@ class WhisperSTT:
         return self._model_override or TIER_MODEL_MAP[self._tier]
 
     def is_model_loaded(self) -> bool:
-        return self._model is not None and self._loaded_model_name == self.model_name
+        return self._model is not None and self._loaded_model_name is not None
 
     def _load_model(self):
         """Lazily imports and constructs the faster-whisper model. Raises
@@ -120,47 +122,73 @@ class WhisperSTT:
         if self.model_name not in candidate_names:
             candidate_names.append(self.model_name)
         # Prioritize multilingual models over .en for accent robustness
-        for fallback in ("large-v3-turbo", "medium", "small", "base", "tiny"):
+        for fallback in ("small", "base", "tiny", "large-v3-turbo", "medium"):
             if fallback not in candidate_names:
                 candidate_names.append(fallback)
 
         model = None
-        for candidate_name in candidate_names:
-            # 1. Try loading on auto/cuda if available
-            try:
-                candidate = WhisperModel(candidate_name, device="auto", compute_type="auto")
-                import numpy as np
-                dummy_audio = np.zeros(1600, dtype=np.float32)
-                try:
-                    gen, _ = candidate.transcribe(dummy_audio, word_timestamps=False)
-                    next(gen, None)
-                    model = candidate
-                    break
-                except Exception as runtime_err:
-                    logger.warning(
-                        "Whisper CUDA runtime failed (%s). Trying CPU for %s.",
-                        runtime_err,
-                        candidate_name,
-                    )
-            except Exception as err:
-                logger.info("WhisperModel(%s, device='auto') failed: %s", candidate_name, err)
+        loaded_name = self.model_name
 
-            # 2. Try CPU int8 (fast and highly accurate on multi-core CPUs)
-            try:
-                model = WhisperModel(candidate_name, device="cpu", compute_type="int8", cpu_threads=8)
-                break
-            except Exception:
+        # 1. Try loading on auto/cuda if CUDA has not failed previously
+        if WhisperSTT._cuda_available is not False:
+            for candidate_name in candidate_names:
                 try:
-                    model = WhisperModel(candidate_name, device="cpu", compute_type="auto", cpu_threads=8)
+                    candidate = WhisperModel(candidate_name, device="auto", compute_type="auto")
+                    import numpy as np
+                    dummy_audio = np.zeros(1600, dtype=np.float32)
+                    try:
+                        gen, _ = candidate.transcribe(dummy_audio, word_timestamps=False)
+                        next(gen, None)
+                        model = candidate
+                        loaded_name = candidate_name
+                        WhisperSTT._cuda_available = True
+                        break
+                    except Exception as runtime_err:
+                        logger.warning(
+                            "Whisper CUDA runtime failed (%s). Falling back to CPU.",
+                            runtime_err,
+                        )
+                        WhisperSTT._cuda_available = False
+                        break
+                except Exception as err:
+                    logger.info("WhisperModel(%s, device='auto') failed: %s", candidate_name, err)
+                    if "cublas" in str(err).lower() or "cuda" in str(err).lower():
+                        WhisperSTT._cuda_available = False
+                        break
+
+        # 2. Try fast locally cached models on CPU to avoid blocking network downloads during interview
+        if model is None:
+            # Exclude massive models on CPU unless explicitly requested
+            cpu_candidates = [c for c in candidate_names if c not in ("large-v3", "large-v2", "large")]
+            for pref in ("small", "base", "tiny"):
+                if pref in cpu_candidates:
+                    cpu_candidates.remove(pref)
+                    cpu_candidates.insert(0, pref)
+
+            # Try local_files_only first so we load instantaneously without network stalls
+            for candidate_name in cpu_candidates:
+                try:
+                    model = WhisperModel(candidate_name, device="cpu", compute_type="int8", cpu_threads=8, local_files_only=True)
+                    loaded_name = candidate_name
                     break
                 except Exception:
                     continue
+
+            # If no cached model matched, try downloading standard small/base models
+            if model is None:
+                for candidate_name in ("base", "small", "tiny"):
+                    try:
+                        model = WhisperModel(candidate_name, device="cpu", compute_type="int8", cpu_threads=8)
+                        loaded_name = candidate_name
+                        break
+                    except Exception:
+                        continue
 
         if model is None:
             raise ModelNotAvailableError(self.model_name)
 
         self._model = model
-        self._loaded_model_name = self.model_name
+        self._loaded_model_name = loaded_name
         return self._model
 
     async def transcribe_complete(
@@ -183,8 +211,8 @@ class WhisperSTT:
             kwargs = {
                 "word_timestamps": True,
                 "language": "en",
-                "beam_size": 5,
-                "best_of": 5,
+                "beam_size": 1,
+                "best_of": 1,
                 "temperature": 0.0,
                 "vad_filter": True,
                 "vad_parameters": dict(min_silence_duration_ms=500),
@@ -213,8 +241,7 @@ class WhisperSTT:
             except Exception as exc:
                 logger.warning("transcribe_complete failed (%s). Retrying on CPU.", exc)
                 from faster_whisper import WhisperModel
-                self._model = WhisperModel(self.model_name, device="cpu", compute_type="int8", cpu_threads=8)
-                self._loaded_model_name = self.model_name
+                self._model = WhisperModel(self._loaded_model_name or "base", device="cpu", compute_type="int8", cpu_threads=8)
                 raw_gen, info = _do_transcribe(self._model)
                 return list(raw_gen), info
 
