@@ -83,3 +83,52 @@ def test_extract_array_preferred_over_object_when_array_comes_first():
     raw = 'Items: [{"key": "val"}]'
     extracted = extract_json_from_llm(raw)
     assert json.loads(extracted) == [{"key": "val"}]
+
+
+def test_strip_think_tags_with_internal_json_braces():
+    raw = """<think>
+Let's see what JSON format we should use:
+{ "debug_plan": true }
+Now let me output the real answer in markdown code block.
+</think>
+```json
+{
+  "status": "ready",
+  "questions": ["Tell me about yourself"]
+}
+```"""
+    extracted = extract_json_from_llm(raw)
+    data = json.loads(extracted)
+    assert data == {"status": "ready", "questions": ["Tell me about yourself"]}
+
+
+def test_strip_think_tags_without_code_fences():
+    raw = """<think>
+Reasoning about the candidate's background { "dummy": 123 }
+</think>
+{
+  "score": 0.85,
+  "feedback": "Strong communication"
+}"""
+    extracted = extract_json_from_llm(raw)
+    data = json.loads(extracted)
+    assert data == {"score": 0.85, "feedback": "Strong communication"}
+
+
+def test_repair_trailing_commas():
+    raw = """{
+  "name": "Jane",
+  "skills": ["Python", "Rust",],
+  "active": true,
+}"""
+    extracted = extract_json_from_llm(raw)
+    data = json.loads(extracted)
+    assert data == {"name": "Jane", "skills": ["Python", "Rust"], "active": True}
+
+
+def test_unclosed_think_tag_truncated():
+    raw = """<think>
+Thinking about this question..."""
+    extracted = extract_json_from_llm(raw)
+    assert extracted == ""
+
