@@ -119,14 +119,20 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
           message: string;
           is_complete?: boolean;
           first_question?: string;
-        }>(sessionId, text);
-        setCurrentMessage(result.message);
+        }>(sessionId, text, true);
         if (result.is_complete) {
           send({ type: "WARM_UP_COMPLETE" });
           if (result.first_question) {
             send({ type: "QUESTION_DELIVERED" });
-            setCurrentMessage(result.first_question);
+            const promptToDeliver = result.message
+              ? `${result.message} ${result.first_question}`
+              : result.first_question;
+            setCurrentMessage(promptToDeliver);
+          } else {
+            setCurrentMessage(result.message);
           }
+        } else {
+          setCurrentMessage(result.message);
         }
       } catch (err) {
         setError((err as Error).message);
