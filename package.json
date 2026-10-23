@@ -2,7 +2,7 @@
   "name": "poise",
   "private": true,
   "scripts": {
-    "start": "cd frontend && npm run tauri dev -- --config ..\\src-tauri\\tauri.conf.json",
-    "tauri:dev": "cd frontend && npm run tauri dev -- --config ..\\src-tauri\\tauri.conf.json"
+    "start": "cd src-tauri && cargo tauri dev",
+    "tauri:dev": "cd src-tauri && cargo tauri dev"
   }
 }
