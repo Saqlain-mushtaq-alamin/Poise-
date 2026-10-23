@@ -470,7 +470,7 @@ export function VideoCallInterviewRoom({
   const displayTranscript = voice.transcript + (voice.interimTranscript ? " " + voice.interimTranscript : "");
 
   return (
-    <div className={`vcir${showCoding ? " vcir--with-coding" : ""}`}>
+    <div className={`vcir${showCoding ? " vcir--with-coding" : ""}`} onPointerDown={unlockGlobalAudio}>
       {/* ── Top bar ── */}
       <div className="vcir__top-bar">
         <div className="vcir__top-brand">
@@ -495,8 +495,32 @@ export function VideoCallInterviewRoom({
                 {currentMessage && (
                   <div className="vcir__ai-speech-bubble">
                     <p>{currentMessage}</p>
-                    {isWarmUp && (
-                      <div style={{ marginTop: "10px" }}>
+                    <div style={{ marginTop: "10px", display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                      <button
+                        type="button"
+                        id="vcir-replay-question-btn"
+                        style={{
+                          background: voice.isAISpeaking ? "rgba(99, 102, 241, 0.4)" : "rgba(255, 255, 255, 0.08)",
+                          border: "1px solid rgba(255, 255, 255, 0.2)",
+                          color: "#e2e8f0",
+                          padding: "4px 12px",
+                          borderRadius: "14px",
+                          fontSize: "0.8rem",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}
+                        onClick={() => {
+                          unlockGlobalAudio();
+                          const speechText = cleanSpeechText(currentMessage);
+                          voice.speakAsAI(speechText, personaVoice);
+                        }}
+                        title="Replay this question aloud"
+                      >
+                        {voice.isAISpeaking ? "🔊 Speaking…" : "🔊 Replay Question"}
+                      </button>
+                      {isWarmUp && (
                         <button
                           type="button"
                           id="vcir-skip-warmup-btn"
@@ -520,8 +544,8 @@ export function VideoCallInterviewRoom({
                         >
                           ⏩ Start Interview Questions
                         </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
