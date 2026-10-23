@@ -37,8 +37,22 @@ interface UseInterviewSessionResult {
  * resetSession() — otherwise the machine stays stuck in "completed" forever.
  */
 export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionResult {
-  // Use a ref so we can replace the actor without re-mounting the whole component
-  const actorRef = useRef(createActor(interviewMachine).start());
+  // Lazy initialization so a new actor is not instantiated on every render
+  const actorRef = useRef<ReturnType<typeof createActor<typeof interviewMachine>> | null>(null);
+  if (!actorRef.current) {
+    actorRef.current = createActor(interviewMachine).start();
+  }
+
+  useEffect(() => {
+    return () => {
+      try {
+        actorRef.current?.stop();
+      } catch {
+        /* ok */
+      }
+    };
+  }, []);
+
   const [, forceRender] = useState(0);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [plan, setPlan] = useState<InterviewPlan | null>(null);
@@ -51,7 +65,7 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
 
   const send = useCallback(
     (event: { type: string }) => {
-      actorRef.current.send(event as never);
+      actorRef.current?.send(event as never);
       forceRender((n) => n + 1);
     },
     []
