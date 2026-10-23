@@ -160,7 +160,10 @@ class WhisperSTT:
         if model is None:
             # Exclude massive models on CPU unless explicitly requested
             cpu_candidates = [c for c in candidate_names if c not in ("large-v3", "large-v2", "large")]
-            for pref in ("small", "base", "tiny"):
+            for pref in ("small.en", "small", "base.en", "base", "tiny"):
+                if pref not in cpu_candidates:
+                    cpu_candidates.append(pref)
+            for pref in reversed(["small.en", "small", "base.en", "base", "tiny"]):
                 if pref in cpu_candidates:
                     cpu_candidates.remove(pref)
                     cpu_candidates.insert(0, pref)
@@ -176,7 +179,7 @@ class WhisperSTT:
 
             # If no cached model matched, try downloading standard small/base models
             if model is None:
-                for candidate_name in ("base", "small", "tiny"):
+                for candidate_name in ("small.en", "base.en", "base", "small", "tiny"):
                     try:
                         model = WhisperModel(candidate_name, device="cpu", compute_type="int8", cpu_threads=8)
                         loaded_name = candidate_name
@@ -350,22 +353,15 @@ class WhisperSTT:
         if len(audio) > 0:
             audio = audio - np.mean(audio)
 
-        # Anti-aliased resampling to 16kHz
+        # Anti-aliased high-fidelity resampling to 16kHz via scipy polyphase FIR filter
         if sample_rate != 16000 and len(audio) > 0:
-            if sample_rate == 48000:
-                # Exact 3:1 decimation with 3-tap averaging to filter high-frequency noise
-                trim = len(audio) - (len(audio) % 3)
-                audio = audio[:trim].reshape(-1, 3).mean(axis=1).astype(np.float32)
-            elif sample_rate == 32000:
-                trim = len(audio) - (len(audio) % 2)
-                audio = audio[:trim].reshape(-1, 2).mean(axis=1).astype(np.float32)
-            elif sample_rate == 44100:
-                target_len = int(len(audio) * 16000 / sample_rate)
-                indices = np.linspace(0, len(audio) - 1, target_len)
-                kernel = np.array([0.25, 0.5, 0.25], dtype=np.float32)
-                filtered = np.convolve(audio, kernel, mode="same")
-                audio = np.interp(indices, np.arange(len(filtered)), filtered).astype(np.float32)
-            else:
+            try:
+                import scipy.signal
+                gcd = int(np.gcd(16000, sample_rate))
+                up = 16000 // gcd
+                down = sample_rate // gcd
+                audio = scipy.signal.resample_poly(audio, up, down).astype(np.float32)
+            except Exception:
                 target_len = int(len(audio) * 16000 / sample_rate)
                 if target_len > 0:
                     indices = np.linspace(0, len(audio) - 1, target_len)
@@ -378,26 +374,25 @@ class WhisperSTT:
                 gain = min(0.08 / rms, 4.0)
                 audio = np.clip(audio * gain, -1.0, 1.0)
 
+        prompt_str = "Hello, well, I think that, um, actually, so, you know... "
+
         def _do_transcribe(m):
             try:
                 return m.transcribe(
                     audio,
                     word_timestamps=False,
                     language="en",
-                    beam_size=5,
-                    best_of=5,
+                    beam_size=1,
+                    best_of=1,
                     temperature=0.0,
                     vad_filter=True,
-                    vad_parameters=dict(min_silence_duration_ms=400),
+                    vad_parameters=dict(min_silence_duration_ms=300),
                     condition_on_previous_text=False,
-                    compression_ratio_threshold=2.4,
-                    log_prob_threshold=-1.0,
-                    no_speech_threshold=0.6,
-                    hallucination_silence_threshold=2.0,
+                    initial_prompt=prompt_str,
                 )
             except TypeError:
                 try:
-                    return m.transcribe(audio, word_timestamps=False, language="en")
+                    return m.transcribe(audio, word_timestamps=False, language="en", initial_prompt=prompt_str)
                 except TypeError:
                     return m.transcribe(audio, word_timestamps=False)
 
