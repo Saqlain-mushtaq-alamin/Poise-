@@ -319,6 +319,9 @@ export function useVoiceInterview({
               if (ctx.state === "suspended") {
                 await ctx.resume().catch(() => {});
               }
+              if (ctx.state === "suspended") {
+                throw new Error("AudioContext is still suspended; falling back to HTMLAudioElement");
+              }
 
               // decodeAudioData consumes the buffer, so pass a clone
               const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
@@ -334,11 +337,18 @@ export function useVoiceInterview({
               startAILevelPollFromAnalyser(analyser);
 
               await new Promise<void>((resolve) => {
-                source.onended = () => {
+                let finished = false;
+                const finish = () => {
+                  if (finished) return;
+                  finished = true;
+                  clearTimeout(safetyTimer);
                   stopAILevelPoll();
                   activeSourceNodeRef.current = null;
                   resolve();
                 };
+                const safetyMs = Math.max(2500, Math.ceil(audioBuffer.duration * 1000) + 1200);
+                const safetyTimer = setTimeout(finish, safetyMs);
+                source.onended = finish;
                 source.start(0);
               });
               backendSucceeded = true;
@@ -348,7 +358,12 @@ export function useVoiceInterview({
 
             // Fallback attempt: HTMLAudioElement with blob URL
             if (!backendSucceeded) {
-              const blob = new Blob([arrayBuffer], { type: "audio/mpeg" });
+              const u8 = new Uint8Array(arrayBuffer.slice(0, 4));
+              const isMp3 =
+                (u8[0] === 0xff && (u8[1] & 0xe0) === 0xe0) ||
+                (u8[0] === 0x49 && u8[1] === 0x44 && u8[2] === 0x33);
+              const mime = isMp3 ? "audio/mpeg" : "audio/wav";
+              const blob = new Blob([arrayBuffer], { type: mime });
               const blobUrl = URL.createObjectURL(blob);
               aiBlobUrlRef.current = blobUrl;
               const audio = new Audio(blobUrl);
@@ -360,6 +375,7 @@ export function useVoiceInterview({
                 const finish = (success: boolean) => {
                   if (done) return;
                   done = true;
+                  clearTimeout(htmlSafetyTimer);
                   stopAILevelPoll();
                   if (success) backendSucceeded = true;
                   if (aiBlobUrlRef.current) {
@@ -370,6 +386,7 @@ export function useVoiceInterview({
                   resolve();
                 };
 
+                const htmlSafetyTimer = setTimeout(() => finish(true), 20000);
                 audio.onended = () => finish(true);
                 audio.onerror = () => finish(false);
 
@@ -391,6 +408,7 @@ export function useVoiceInterview({
     if (!backendSucceeded) {
       console.info("[TTS] Using browser speechSynthesis fallback for message:", text.slice(0, 30));
       setPhase("ai-speaking");
+      phaseRef.current = "ai-speaking";
       try {
         await speakWithBrowserTTS(text, voice);
       } catch (err) {
@@ -398,7 +416,8 @@ export function useVoiceInterview({
       }
     }
 
-    if (phaseRef.current === "ai-speaking") setPhase("idle");
+    phaseRef.current = "idle";
+    setPhase("idle");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backendBaseUrl, cancelAISpeech, enabled]);
 
