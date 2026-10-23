@@ -340,10 +340,15 @@ export function VideoCallInterviewRoom({
   // Keep phaseRef in sync
   useEffect(() => { phaseRef.current = voice.phase; }, [voice.phase]);
 
+  // Prime audio hardware on room mount
+  useEffect(() => {
+    unlockGlobalAudio();
+  }, []);
+
   // ── Auto-play AI message immediately when it changes ──────────────────
   useEffect(() => {
-    if (!currentMessage || currentMessage === playedMessageRef.current) return;
-    if (!isActiveSession(machineState) && !isWarmUpState(machineState)) return;
+    if (!currentMessage || !currentMessage.trim() || isComplete) return;
+    if (currentMessage === playedMessageRef.current) return;
 
     playedMessageRef.current = currentMessage;
     setShowFeedback(false);
@@ -354,8 +359,11 @@ export function VideoCallInterviewRoom({
 
     let cancelled = false;
 
+    // Clean markdown formatting before speaking so the voice sounds natural and conversational
+    const speechText = cleanSpeechText(currentMessage);
+
     // Immediately trigger speakAsAI so the voice auto-plays right as the question appears
-    voice.speakAsAI(currentMessage, personaVoice).then(() => {
+    voice.speakAsAI(speechText, personaVoice).then(() => {
       if (!cancelled && canUserAnswerRef.current) {
         voice.clearTranscript();
         voice.startListening();
