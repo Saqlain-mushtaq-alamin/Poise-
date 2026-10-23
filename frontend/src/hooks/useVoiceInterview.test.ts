@@ -82,10 +82,13 @@ describe("useVoiceInterview", () => {
     expect(typeof result.current.startListening).toBe("function");
     // Verify startListening is callable with dynamic timer options without throwing
     await act(async () => {
-      // Mock getUserMedia
-      navigator.mediaDevices = {
-        getUserMedia: vi.fn().mockRejectedValue(new Error("No test mic")),
-      } as unknown as MediaDevices;
+      Object.defineProperty(navigator, "mediaDevices", {
+        value: {
+          getUserMedia: vi.fn().mockRejectedValue(new Error("No test mic")),
+        },
+        configurable: true,
+        writable: true,
+      });
       await result.current.startListening({ maxListenSecs: 130, silenceThresholdSecs: 5.5 });
     });
     // Expected graceful mic error without uncaught promise rejection
