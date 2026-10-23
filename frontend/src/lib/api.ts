@@ -117,8 +117,11 @@ export class PoiseAPI {
     return this.request<T>("POST", `/interview/sessions/${id}/start`);
   }
 
-  async respondToWarmUp<T = unknown>(id: string, answer: unknown): Promise<T> {
-    return this.request<T>("POST", `/interview/sessions/${id}/warmup-respond`, { text: answer });
+  async respondToWarmUp<T = unknown>(id: string, answer: unknown, finishWarmup: boolean = true): Promise<T> {
+    return this.request<T>("POST", `/interview/sessions/${id}/warmup-respond`, {
+      text: typeof answer === "string" ? answer : String(answer ?? ""),
+      finish_warmup: finishWarmup,
+    });
   }
 
   async submitAnswer<T = unknown>(id: string, data: unknown): Promise<T> {

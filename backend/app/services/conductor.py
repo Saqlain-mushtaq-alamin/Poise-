@@ -158,6 +158,7 @@ class InterviewConductor:
                 stream=False,
                 response_format={"type": "json_object"},
                 max_tokens=800,
+                timeout=25,
             )
             cleaned_response = extract_json_from_llm(raw)
             payload = json.loads(cleaned_response)
@@ -184,6 +185,7 @@ class InterviewConductor:
                 messages=[{"role": "user", "content": prompt}],
                 model_role=ModelRole.REASONING,
                 stream=False,
+                timeout=25,
             )
         except Exception:
             return "Could you elaborate further on how you handled key challenges in that scenario?"

@@ -81,6 +81,7 @@ class SessionResponse(BaseModel):
 
 class WarmUpRespondRequest(BaseModel):
     text: str
+    finish_warmup: bool = False
 
 
 class WarmUpRespondResponse(BaseModel):
@@ -405,7 +406,9 @@ async def warmup_respond(
     result = await conductor_warmup.respond_to_small_talk(body.text, stage, persona)
     detail.warm_up_stage = result.next_stage
 
-    if not result.is_complete:
+    is_complete = result.is_complete or body.finish_warmup
+
+    if not is_complete:
         db.commit()
         return WarmUpRespondResponse(message=result.text, is_complete=False)
 
@@ -450,6 +453,15 @@ async def submit_answer(
     detail = _get_session_detail(db, session_id)
     sm = SessionStateMachine(session_id=session_id, state=detail.state)
 
+    if sm.state == "warm_up":
+        try:
+            sm.fire("warm_up_complete")
+            planned = _current_planned_question(detail)
+            if planned:
+                sm.fire("question_delivered")
+        except Exception:
+            pass
+
     try:
         sm.fire("answer_received")
     except InvalidTransitionError as err:
@@ -462,7 +474,16 @@ async def submit_answer(
         .first()
     )
     if open_turn is None:
-        raise HTTPException(status_code=400, detail="No open question awaiting an answer")
+        planned = _current_planned_question(detail)
+        if planned:
+            q, _ = planned
+            open_turn = QuestionTurn(
+                session_id=session_id, question_id=q.id, question_text=q.text
+            )
+            db.add(open_turn)
+            db.commit()
+        else:
+            raise HTTPException(status_code=400, detail="No open question awaiting an answer")
 
     planned = _current_planned_question(detail)
     if planned is None:
