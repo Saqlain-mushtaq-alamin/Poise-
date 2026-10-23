@@ -93,12 +93,12 @@ export function unlockGlobalAudio(): void {
 export function cleanSpeechText(raw: string): string {
   if (!raw) return "";
   return raw
+    .replace(/```[\s\S]*?```/g, "Code block omitted.") // Code blocks
     .replace(/\*\*(.*?)\*\*/g, "$1") // Bold **text**
     .replace(/\*(.*?)\*/g, "$1")     // Italic *text*
     .replace(/__(.*?)__/g, "$1")     // Bold __text__
     .replace(/_(.*?)_/g, "$1")       // Italic _text_
-    .replace(/^#+\s+/gm, "")         // Headers #
-    .replace(/```[\s\S]*?```/g, "Code block omitted.") // Code blocks
+    .replace(/#+/g, "")              // Remove all header hashes
     .replace(/`([^`]+)`/g, "$1")     // Inline code `foo`
     .replace(/^\s*[-*+]\s+/gm, "")   // Bullet points
     .replace(/^\s*\d+\.\s+/gm, "")   // Numbered lists
