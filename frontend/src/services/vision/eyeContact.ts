@@ -49,9 +49,14 @@ function eyeGazeRatio(
   return { horizontal, vertical };
 }
 
-function classifyDirection(horizontal: number, vertical: number): { direction: GazeDirection; confidence: number } {
-  const horizontalOffset = Math.abs(horizontal - 0.5);
-  const verticalOffset = Math.abs(vertical - 0.5);
+function classifyDirection(
+  horizontal: number,
+  vertical: number,
+  baselineH: number = 0.5,
+  baselineV: number = 0.5
+): { direction: GazeDirection; confidence: number } {
+  const horizontalOffset = Math.abs(horizontal - baselineH);
+  const verticalOffset = Math.abs(vertical - baselineV);
 
   if (horizontalOffset <= DIRECT_TOLERANCE && verticalOffset <= DIRECT_TOLERANCE) {
     const confidence = 1 - Math.max(horizontalOffset, verticalOffset) / DIRECT_TOLERANCE;
@@ -60,11 +65,11 @@ function classifyDirection(horizontal: number, vertical: number): { direction: G
 
   // Whichever axis is further off-center dominates the classification.
   if (horizontalOffset >= verticalOffset) {
-    const direction = horizontal < 0.5 ? "away_left" : "away_right";
+    const direction = horizontal < baselineH ? "away_left" : "away_right";
     return { direction, confidence: clamp01(horizontalOffset / 0.5) };
   }
 
-  const direction = vertical < 0.5 ? "up" : "down";
+  const direction = vertical < baselineV ? "up" : "down";
   return { direction, confidence: clamp01(verticalOffset / 0.5) };
 }
 
@@ -74,6 +79,24 @@ function clamp01(n: number): number {
 
 export class EyeContactAnalyzer {
   private history: { timestampMs: number; isDirect: boolean }[] = [];
+  private baselineHorizontal: number = 0.5;
+  private baselineVertical: number = 0.5;
+  private isCalibrated: boolean = false;
+  private calibrationSamples: { h: number; v: number }[] = [];
+
+  setBaseline(horizontal: number, vertical: number): void {
+    this.baselineHorizontal = horizontal;
+    this.baselineVertical = vertical;
+    this.isCalibrated = true;
+  }
+
+  getBaseline(): { horizontal: number; vertical: number; isCalibrated: boolean } {
+    return {
+      horizontal: this.baselineHorizontal,
+      vertical: this.baselineVertical,
+      isCalibrated: this.isCalibrated,
+    };
+  }
 
   processFrame(landmarks: Point3D[], timestampMs: number): EyeContactSignal {
     const right = eyeGazeRatio(landmarks, FACE.RIGHT_IRIS_CENTER, RIGHT_EYE_BOUNDS);
@@ -81,7 +104,27 @@ export class EyeContactAnalyzer {
 
     const horizontal = (right.horizontal + left.horizontal) / 2;
     const vertical = (right.vertical + left.vertical) / 2;
-    const { direction, confidence } = classifyDirection(horizontal, vertical);
+
+    // Auto-calibrate on the initial 15 frames if candidate is roughly centered
+    if (!this.isCalibrated && this.calibrationSamples.length < 15) {
+      this.calibrationSamples.push({ h: horizontal, v: vertical });
+      if (this.calibrationSamples.length === 15) {
+        const avgH = this.calibrationSamples.reduce((s, c) => s + c.h, 0) / 15;
+        const avgV = this.calibrationSamples.reduce((s, c) => s + c.v, 0) / 15;
+        if (Math.abs(avgH - 0.5) < 0.25 && Math.abs(avgV - 0.5) < 0.25) {
+          this.baselineHorizontal = avgH;
+          this.baselineVertical = avgV;
+          this.isCalibrated = true;
+        }
+      }
+    }
+
+    const { direction, confidence } = classifyDirection(
+      horizontal,
+      vertical,
+      this.baselineHorizontal,
+      this.baselineVertical
+    );
 
     this.history.push({ timestampMs, isDirect: direction === "direct" });
     this.history = this.history.filter((h) => timestampMs - h.timestampMs <= ROLLING_WINDOW_MS);
@@ -100,6 +143,10 @@ export class EyeContactAnalyzer {
 
   reset(): void {
     this.history = [];
+    this.calibrationSamples = [];
+    this.isCalibrated = false;
+    this.baselineHorizontal = 0.5;
+    this.baselineVertical = 0.5;
   }
 }
 
