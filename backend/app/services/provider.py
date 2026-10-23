@@ -20,6 +20,7 @@ from enum import Enum
 from typing import Any
 
 from app.services.cost import CostEstimate, TokenTracker
+from app.services.json_utils import strip_thinking_tokens
 from app.services.tier import HardwareTier, ModelPlan, model_plan_for
 
 logger = logging.getLogger("poise.provider")
@@ -34,6 +35,47 @@ _PROVIDER_ENV_VAR = {
 }
 
 SUPPORTED_PROVIDERS = tuple(_PROVIDER_ENV_VAR.keys()) + ("custom",)
+
+
+@dataclass
+class ModelCapability:
+    supports_json: bool = True
+    needs_no_think: bool = False
+    num_ctx: int = 8192
+    temperature: float = 0.7
+
+
+MODEL_CAPABILITIES: dict[str, ModelCapability] = {
+    # Ollama / Local Models
+    "llama3.1:8b": ModelCapability(supports_json=True, needs_no_think=False, num_ctx=8192, temperature=0.7),
+    "llama3:8b": ModelCapability(supports_json=True, needs_no_think=False, num_ctx=8192, temperature=0.7),
+    "qwen2.5:7b": ModelCapability(supports_json=True, needs_no_think=False, num_ctx=8192, temperature=0.6),
+    "qwen2.5:14b": ModelCapability(supports_json=True, needs_no_think=False, num_ctx=8192, temperature=0.6),
+    "qwen2.5-coder:7b": ModelCapability(supports_json=True, needs_no_think=False, num_ctx=8192, temperature=0.5),
+    "qwen3": ModelCapability(supports_json=True, needs_no_think=True, num_ctx=8192, temperature=0.6),
+    "deepseek-r1": ModelCapability(supports_json=True, needs_no_think=True, num_ctx=8192, temperature=0.6),
+    "mistral:7b": ModelCapability(supports_json=True, needs_no_think=False, num_ctx=8192, temperature=0.7),
+    "phi3:mini": ModelCapability(supports_json=False, needs_no_think=False, num_ctx=4096, temperature=0.5),
+    # Cloud Models
+    "gpt-4o-mini": ModelCapability(supports_json=True, needs_no_think=False, num_ctx=16384, temperature=0.7),
+    "claude-3-5-sonnet": ModelCapability(supports_json=True, needs_no_think=False, num_ctx=16384, temperature=0.7),
+    "gemini-1.5-flash": ModelCapability(supports_json=True, needs_no_think=False, num_ctx=16384, temperature=0.7),
+}
+
+
+def get_model_capability(model: str) -> ModelCapability:
+    clean = model.lower().replace("ollama/", "")
+    for k, cap in MODEL_CAPABILITIES.items():
+        if clean == k or clean.startswith(k + ":") or k in clean:
+            return cap
+    # Detect thinking models dynamically by name (e.g. qwen3, deepseek-r1, any reasoning model)
+    is_thinking_model = any(tag in clean for tag in ("r1", "think", "reason", "qwen3"))
+    return ModelCapability(
+        supports_json=True,
+        needs_no_think=is_thinking_model,
+        num_ctx=8192,
+        temperature=0.7,
+    )
 
 
 class ModelRole(str, Enum):
