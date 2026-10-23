@@ -10,12 +10,15 @@ real binary frames, not a mock, even though no browser is involved.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
+import uuid
 
 import numpy as np
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, File, Form, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from app.config import Settings, get_settings
 from app.services.stt import ModelNotAvailableError, WhisperSTT, get_stt
 from app.services.tts import TTSEngine, VoiceInfo, get_tts_engine
 from app.services.vad import VAD, get_vad
