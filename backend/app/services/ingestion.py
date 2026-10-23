@@ -178,12 +178,15 @@ class ResumeParser:
                 full_text=text,
                 name=name[:100],
                 summary=lines[1] if len(lines) > 1 else text[:200],
+                is_structured=False,
+                warning="AI resume parsing failed or timed out; basic text extracted without full skills and experience breakdown.",
             )
 
         try:
             cleaned_response = extract_json_from_llm(raw_response)
             data = ResumeData.model_validate_json(cleaned_response)
             data.full_text = text
+            data.is_structured = True
             return data
         except (ValidationError, ValueError) as err:
             raise StructuringError(
@@ -221,11 +224,15 @@ class JDParser:
                 responsibilities=lines[1:5] if len(lines) > 1 else [],
                 experience_level="mid",
                 domain="General",
+                is_structured=False,
+                warning="AI job description parsing failed or timed out; basic text extracted without full skill extraction.",
             )
 
         try:
             cleaned_response = extract_json_from_llm(raw_response)
-            return JobDescription.model_validate_json(cleaned_response)
+            jd = JobDescription.model_validate_json(cleaned_response)
+            jd.is_structured = True
+            return jd
         except (ValidationError, ValueError) as err:
             raise StructuringError(
                 f"LLM response didn't match the expected job description schema: {err}"
