@@ -62,6 +62,7 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
   );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [isSessionComplete, setIsSessionComplete] = useState(false);
 
   const send = useCallback(
     (event: { type: string }) => {
@@ -166,17 +167,31 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
           send({ type: "QUESTION_DELIVERED" });
           setCurrentMessage(result.next_message ?? null);
         } else {
-          send({ type: "EVALUATION_NEXT_QUESTION" });
-          send({ type: "END_INTERVIEW" });
-          send({ type: "WRAP_UP_QUESTIONS" });
-          send({ type: "SESSION_FINALIZED" });
+          setIsSessionComplete(true);
+          try {
+            send({ type: "EVALUATION_NEXT_QUESTION" });
+            send({ type: "END_INTERVIEW" });
+            send({ type: "WRAP_UP_QUESTIONS" });
+            send({ type: "SESSION_FINALIZED" });
+          } catch {
+            /* ok */
+          }
           setCurrentMessage(null);
         }
       } catch (err) {
-        // If evaluation failed, recover to asking -> listening so candidate can retry
-        send({ type: "EVALUATION_NEXT_QUESTION" });
-        send({ type: "QUESTION_DELIVERED" });
-        setError((err as Error).message);
+        const msg = (err as Error).message ?? String(err);
+        if (
+          msg.includes("complete") ||
+          msg.includes("No active plan question") ||
+          msg.includes("No open question")
+        ) {
+          setIsSessionComplete(true);
+          setCurrentMessage(null);
+        } else {
+          send({ type: "EVALUATION_NEXT_QUESTION" });
+          send({ type: "QUESTION_DELIVERED" });
+          setError(msg);
+        }
       } finally {
         setBusy(false);
       }
@@ -214,6 +229,7 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
     setLastFeedback(null);
     setError(null);
     setBusy(false);
+    setIsSessionComplete(false);
     forceRender((n) => n + 1);
   }, []);
 
@@ -227,7 +243,7 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
     plan,
     currentMessage,
     lastFeedback,
-    isComplete: machineState === "completed" || machineState === "archived",
+    isComplete: isSessionComplete || machineState === "completed" || machineState === "archived",
     error,
     busy,
     createAndStart,
