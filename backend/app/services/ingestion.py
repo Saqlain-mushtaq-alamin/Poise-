@@ -80,6 +80,8 @@ class ResumeData(BaseModel):
     education: list[Education] = []
     projects: list[Project] = []
     certifications: list[str] = []
+    is_structured: bool = True
+    warning: str | None = None
 
 
 class JobDescription(BaseModel):
@@ -90,6 +92,8 @@ class JobDescription(BaseModel):
     responsibilities: list[str] = []
     experience_level: str | None = None
     domain: str | None = None
+    is_structured: bool = True
+    warning: str | None = None
 
 
 RESUME_PARSE_PROMPT = """You extract structured data from resumes. Given the raw resume \
