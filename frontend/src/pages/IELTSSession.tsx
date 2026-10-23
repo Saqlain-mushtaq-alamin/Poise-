@@ -190,8 +190,12 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
               type="button"
               className="ielts-primary-btn"
               onClick={() => {
-                voice.clearTranscript();
-                voice.startListening();
+                clearTranscript();
+                const isPart2 = state.matches("part2Speaking");
+                const isPart3 = state.matches("part3Discussion");
+                const maxListenSecs = isPart2 ? 130 : isPart3 ? 75 : 60;
+                const silenceThresholdSecs = isPart2 ? 5.5 : isPart3 ? 4.0 : 3.5;
+                startListening({ maxListenSecs, silenceThresholdSecs });
               }}
             >
               🎙️ Start Microphone
