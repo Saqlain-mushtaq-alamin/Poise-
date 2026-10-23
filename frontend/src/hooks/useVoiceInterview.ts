@@ -134,21 +134,37 @@ export function useVoiceInterview({
     setSpeechApiAvailable(!!SR);
   }, []);
 
-  // Un-suspend AudioContext on any user interaction (click or keypress)
+  const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  // Un-suspend AudioContext on any user interaction (click, keypress, touch)
   useEffect(() => {
     const unlock = () => {
-      if (speakerCtxRef.current && speakerCtxRef.current.state === "suspended") {
-        speakerCtxRef.current.resume().catch(() => {});
-      }
-      if (micCtxRef.current && micCtxRef.current.state === "suspended") {
-        micCtxRef.current.resume().catch(() => {});
-      }
+      try {
+        const AudioCtxClass =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (!speakerCtxRef.current || speakerCtxRef.current.state === "closed") {
+          speakerCtxRef.current = new AudioCtxClass();
+        }
+        if (speakerCtxRef.current.state === "suspended") {
+          speakerCtxRef.current.resume().catch(() => {});
+        }
+        if (micCtxRef.current && micCtxRef.current.state === "suspended") {
+          micCtxRef.current.resume().catch(() => {});
+        }
+        if (typeof window !== "undefined" && window.speechSynthesis && window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
+      } catch { /* ok */ }
     };
+    unlock();
     window.addEventListener("click", unlock, { passive: true });
     window.addEventListener("keydown", unlock, { passive: true });
+    window.addEventListener("touchstart", unlock, { passive: true });
     return () => {
       window.removeEventListener("click", unlock);
       window.removeEventListener("keydown", unlock);
+      window.removeEventListener("touchstart", unlock);
     };
   }, []);
 
@@ -198,10 +214,26 @@ export function useVoiceInterview({
         return;
       }
       window.speechSynthesis.cancel();
+      if (window.speechSynthesis.paused) {
+        try { window.speechSynthesis.resume(); } catch { /* ok */ }
+      }
       const utt = new SpeechSynthesisUtterance(text);
       utt.rate = 0.95;
       utt.pitch = 1;
       utt.volume = 1.0;
+      activeUtteranceRef.current = utt;
+
+      let resolved = false;
+      const finish = () => {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(safetyTimer);
+        activeUtteranceRef.current = null;
+        resolve();
+      };
+
+      const maxWaitMs = Math.max(4000, Math.ceil(text.length * 85));
+      const safetyTimer = setTimeout(finish, maxWaitMs);
 
       const assignVoiceAndSpeak = () => {
         const voices = window.speechSynthesis.getVoices();
@@ -215,8 +247,8 @@ export function useVoiceInterview({
           }
           if (match) utt.voice = match;
         }
-        utt.onend = () => resolve();
-        utt.onerror = () => resolve();
+        utt.onend = finish;
+        utt.onerror = finish;
         window.speechSynthesis.speak(utt);
       };
 
