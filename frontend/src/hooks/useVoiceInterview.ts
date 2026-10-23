@@ -18,6 +18,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { float32ToPCM16Bytes } from "../lib/audio-encoding";
+import { getSharedAudioContext, unlockGlobalAudio } from "../lib/audio-manager";
 import { VoiceSocket } from "../services/audio/VoiceSocket";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -136,24 +137,14 @@ export function useVoiceInterview({
 
   const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  // Un-suspend AudioContext on any user interaction (click, keypress, touch)
+  // Un-suspend AudioContext and prime audio subsystem on mount & interaction
   useEffect(() => {
     const unlock = () => {
       try {
-        const AudioCtxClass =
-          window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        if (!speakerCtxRef.current || speakerCtxRef.current.state === "closed") {
-          speakerCtxRef.current = new AudioCtxClass();
-        }
-        if (speakerCtxRef.current.state === "suspended") {
-          speakerCtxRef.current.resume().catch(() => {});
-        }
+        unlockGlobalAudio();
+        speakerCtxRef.current = getSharedAudioContext();
         if (micCtxRef.current && micCtxRef.current.state === "suspended") {
           micCtxRef.current.resume().catch(() => {});
-        }
-        if (typeof window !== "undefined" && window.speechSynthesis && window.speechSynthesis.paused) {
-          window.speechSynthesis.resume();
         }
       } catch { /* ok */ }
     };
@@ -228,12 +219,23 @@ export function useVoiceInterview({
         if (resolved) return;
         resolved = true;
         clearTimeout(safetyTimer);
+        clearInterval(resumeInterval);
         activeUtteranceRef.current = null;
         resolve();
       };
 
       const maxWaitMs = Math.max(4000, Math.ceil(text.length * 85));
       const safetyTimer = setTimeout(finish, maxWaitMs);
+
+      // Chromium speech synthesis bug workaround: unpause every 8 seconds
+      const resumeInterval = setInterval(() => {
+        if (typeof window !== "undefined" && window.speechSynthesis && window.speechSynthesis.speaking) {
+          try {
+            window.speechSynthesis.pause();
+            window.speechSynthesis.resume();
+          } catch { /* ok */ }
+        }
+      }, 8000);
 
       const assignVoiceAndSpeak = () => {
         const voices = window.speechSynthesis.getVoices();
@@ -307,20 +309,15 @@ export function useVoiceInterview({
         if (res.ok) {
           const arrayBuffer = await res.arrayBuffer();
           if (arrayBuffer.byteLength > 100) {
-            // First attempt: Web Audio API (unlocked, pristine PCM playback directly to hardware)
+            // First attempt: Web Audio API (using shared persistent AudioContext)
             try {
-              const AudioCtxClass =
-                window.AudioContext ||
-                (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-              if (!speakerCtxRef.current || speakerCtxRef.current.state === "closed") {
-                speakerCtxRef.current = new AudioCtxClass();
-              }
-              const ctx = speakerCtxRef.current;
-              if (ctx.state === "suspended") {
+              const ctx = getSharedAudioContext();
+              speakerCtxRef.current = ctx;
+              if (ctx && ctx.state === "suspended") {
                 await ctx.resume().catch(() => {});
               }
-              if (ctx.state === "suspended") {
-                throw new Error("AudioContext is still suspended; falling back to HTMLAudioElement");
+              if (!ctx || typeof ctx.decodeAudioData !== "function") {
+                throw new Error("AudioContext not ready");
               }
 
               // decodeAudioData consumes the buffer, so pass a clone
