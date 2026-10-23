@@ -142,6 +142,8 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
       if (!api || !sessionId) return;
       setBusy(true);
       setError(null);
+      // Advance state machine from listening to evaluating
+      send({ type: "ANSWER_RECEIVED" });
       try {
         const result = await api.submitAnswer<{
           score: number;
@@ -168,6 +170,9 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
           setCurrentMessage(null);
         }
       } catch (err) {
+        // If evaluation failed, recover to asking -> listening so candidate can retry
+        send({ type: "EVALUATION_NEXT_QUESTION" });
+        send({ type: "QUESTION_DELIVERED" });
         setError((err as Error).message);
       } finally {
         setBusy(false);
@@ -198,7 +203,7 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
 
   const resetSession = useCallback(() => {
     // Stop the old machine and create a brand-new one so state resets to idle
-    try { actorRef.current.stop(); } catch { /* ok */ }
+    try { actorRef.current?.stop(); } catch { /* ok */ }
     actorRef.current = createActor(interviewMachine).start();
     setSessionId(null);
     setPlan(null);
@@ -209,7 +214,7 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
     forceRender((n) => n + 1);
   }, []);
 
-  const snapshotValue = actorRef.current.getSnapshot().value;
+  const snapshotValue = actorRef.current?.getSnapshot().value ?? "idle";
   const machineState =
     typeof snapshotValue === "string" ? snapshotValue : JSON.stringify(snapshotValue);
 
