@@ -85,13 +85,14 @@ class IELTSSessionConductor:
         parent = ParentSession(id=str(uuid4()), mode="ielts", status="created")
         self.db.add(parent)
 
-        # Collect previously used categories to avoid repetition across sessions.
-        exclude_categories = self._get_used_categories(limit=5)
+        # Collect previously used categories and cue cards to avoid repetition across sessions.
+        exclude_categories, exclude_cue_cards = self._get_used_history(limit=6)
 
         topic_set = await self.topic_generator.generate_session_topics(
             target_band=target_band,
             topics_preference=topics_preference,
             exclude_categories=exclude_categories,
+            exclude_cue_cards=exclude_cue_cards,
         )
 
         row = IELTSSession(
@@ -109,25 +110,29 @@ class IELTSSessionConductor:
         self.db.refresh(row)
         return row
 
-    def _get_used_categories(self, limit: int = 5) -> list[str]:
-        """Return Part 1 category names used in recent sessions to avoid repetition."""
+    def _get_used_history(self, limit: int = 6) -> tuple[list[str], list[str]]:
+        """Return Part 1 category names and Part 2 cue card IDs used in recent sessions to avoid repetition."""
         try:
             recent = (
                 self.db.query(IELTSSession)
-                .filter(IELTSSession.part1_categories.isnot(None))
                 .order_by(IELTSSession.created_at.desc())
                 .limit(limit)
                 .all()
             )
-            seen: list[str] = []
+            seen_cats: list[str] = []
+            seen_cards: list[str] = []
             for row in recent:
                 for cat in (row.part1_categories or []):
                     name = cat.get("category", "")
-                    if name and name not in seen:
-                        seen.append(name)
-            return seen
+                    if name and name not in seen_cats:
+                        seen_cats.append(name)
+                if row.part2_cue_card:
+                    cid = row.part2_cue_card.get("id") or row.part2_cue_card.get("topic")
+                    if cid and cid not in seen_cards:
+                        seen_cards.append(cid)
+            return seen_cats, seen_cards
         except Exception:
-            return []
+            return [], []
 
     # -- flow control ------------------------------------------------------
 
