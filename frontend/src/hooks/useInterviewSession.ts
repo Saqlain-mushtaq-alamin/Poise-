@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { PoiseAPI } from "../lib/api";
 import type { EvaluationRecord, InterviewConfig, InterviewPlan } from "../lib/types";

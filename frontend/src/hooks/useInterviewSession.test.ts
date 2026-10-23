@@ -153,4 +153,40 @@ describe("useInterviewSession", () => {
     expect(result.current.error).toBe("Sidecar not connected yet");
     expect(result.current.sessionId).toBeNull();
   });
+
+  it("submitAnswer with follow_up correctly advances through evaluating and followUp to listening", async () => {
+    const api = fakeApi({
+      respondToWarmUp: vi.fn().mockResolvedValue({
+        message: "Let's begin.",
+        is_complete: true,
+        first_question: "Q1?",
+        question_id: "q1",
+      }),
+      submitAnswer: vi.fn().mockResolvedValue({
+        score: 0.6,
+        feedback: "Could you elaborate?",
+        reaction: "Hmm...",
+        next_action: "follow_up",
+        next_message: "Can you provide a specific metric?",
+        next_question_id: "q1_followup",
+        framework_missing: ["Action", "Result"],
+      }),
+    });
+    const { result } = renderHook(() => useInterviewSession(api));
+
+    await act(async () => {
+      await result.current.createAndStart("r1", "j1", {}, "professional");
+    });
+    await act(async () => {
+      await result.current.respondToWarmUp("ready!");
+    });
+    await act(async () => {
+      await result.current.submitAnswer("Incomplete answer");
+    });
+
+    expect(result.current.lastFeedback?.score).toBe(0.6);
+    expect(result.current.currentMessage).toBe("Can you provide a specific metric?");
+    expect(result.current.machineState).toEqual(JSON.stringify({ inProgress: "listening" }));
+  });
 });
+
