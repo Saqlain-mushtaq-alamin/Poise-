@@ -208,6 +208,7 @@ export function InterviewSetup({ api }: InterviewSetupProps) {
         personaVoice={selectedPersona.voice ?? "en-US-AvaNeural"}
         enableCoding={hasCoding}
         sessionId={session.sessionId}
+        error={session.error}
       />
     );
   }
