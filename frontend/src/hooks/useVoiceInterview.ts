@@ -32,10 +32,15 @@ export type VoicePhase =
 
 interface UseVoiceInterviewOptions {
   backendBaseUrl: string;
-  onAnswerReady: (text: string) => void;
+  onAnswerReady: (text: string, audioPath?: string) => void;
   silenceThresholdSecs?: number;
   maxListenSecs?: number;
   enabled?: boolean;
+}
+
+export interface StartListeningOptions {
+  silenceThresholdSecs?: number;
+  maxListenSecs?: number;
 }
 
 interface UseVoiceInterviewReturn {
@@ -46,7 +51,7 @@ interface UseVoiceInterviewReturn {
   isSpeaking: boolean;
   speakAsAI: (text: string, voice?: string) => Promise<void>;
   cancelAISpeech: () => void;
-  startListening: () => void;
+  startListening: (opts?: StartListeningOptions) => Promise<void>;
   stopListening: () => void;
   clearTranscript: () => void;
   vadLevel: number;
