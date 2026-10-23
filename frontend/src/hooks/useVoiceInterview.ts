@@ -571,8 +571,11 @@ export function useVoiceInterview({
   }
 
   // ---- Start / stop listening ----
-  const startListening = useCallback(async () => {
+  const startListening = useCallback(async (opts?: StartListeningOptions) => {
     if (phaseRef.current === "listening") return;
+
+    if (opts?.silenceThresholdSecs) activeSilenceThresholdRef.current = opts.silenceThresholdSecs;
+    if (opts?.maxListenSecs) activeMaxListenSecsRef.current = opts.maxListenSecs;
 
     if (phaseRef.current === "ai-speaking") {
       cancelAISpeech();
@@ -584,6 +587,7 @@ export function useVoiceInterview({
     setInterimTranscript("");
     setMicError(null);
     lastActivityRef.current = Date.now();
+    recordedChunksRef.current = [];
 
     try {
       // First try with audio enhancements, fall back to basic constraints
@@ -602,6 +606,31 @@ export function useVoiceInterview({
       }
       micStreamRef.current = stream;
       setMicAllowed(true);
+
+      // Start MediaRecorder for pass 2 full utterance audio capture
+      if (typeof MediaRecorder !== "undefined") {
+        try {
+          let mimeType = "";
+          if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+            mimeType = "audio/webm;codecs=opus";
+          } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+            mimeType = "audio/webm";
+          } else if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) {
+            mimeType = "audio/ogg;codecs=opus";
+          }
+          const rec = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+          rec.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) {
+              recordedChunksRef.current.push(event.data);
+            }
+          };
+          rec.start(250);
+          mediaRecorderRef.current = rec;
+        } catch (recErr) {
+          console.warn("[useVoiceInterview] MediaRecorder initialization failed:", recErr);
+          mediaRecorderRef.current = null;
+        }
+      }
 
       const AudioCtxClass =
         window.AudioContext ||
@@ -669,6 +698,10 @@ export function useVoiceInterview({
 
   const stopListening = useCallback(() => {
     clearAllTimers();
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      try { mediaRecorderRef.current.stop(); } catch { /* ok */ }
+    }
+    mediaRecorderRef.current = null;
     stopSpeechRecognition();
     stopMicLevelPoll();
     micStreamRef.current?.getTracks().forEach(t => t.stop());
