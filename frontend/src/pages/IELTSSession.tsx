@@ -56,10 +56,10 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
   const lastPlayedRef = useRef<string | null>(null);
 
   const handleAnswerReady = useCallback(
-    (text: string) => {
+    (text: string, audioPath?: string) => {
       send({
         type: "ANSWER_SUBMITTED",
-        audioPath: "",
+        audioPath: audioPath || "",
         transcript: text,
       });
     },
@@ -72,6 +72,17 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
     backendBaseUrl,
     onAnswerReady: handleAnswerReady,
   });
+
+  const {
+    phase: voicePhase,
+    transcript: voiceTranscript,
+    interimTranscript: voiceInterimTranscript,
+    isSpeaking: voiceIsSpeaking,
+    speakAsAI,
+    stopListening,
+    clearTranscript,
+    startListening,
+  } = voice;
 
   // ── Voice TTS & Auto-Listen Routing ──────────────────────────────────────
   useEffect(() => {
@@ -101,20 +112,24 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
     if (messageToSpeak && messageToSpeak !== lastPlayedRef.current) {
       lastPlayedRef.current = messageToSpeak;
 
-      voice.stopListening();
-      voice.speakAsAI(messageToSpeak).then(() => {
+      stopListening();
+      speakAsAI(messageToSpeak).then(() => {
         if (shouldListenAfter && !state.matches("error") && !state.matches("complete")) {
-          voice.clearTranscript();
-          voice.startListening();
+          clearTranscript();
+          const isPart2 = state.matches("part2Speaking");
+          const isPart3 = state.matches("part3Discussion");
+          const maxListenSecs = isPart2 ? 130 : isPart3 ? 75 : 60;
+          const silenceThresholdSecs = isPart2 ? 5.5 : isPart3 ? 4.0 : 3.5;
+          startListening({ maxListenSecs, silenceThresholdSecs });
         }
       });
     }
-  }, [state.value, prompt, voice, state]);
+  }, [state.value, prompt, stopListening, speakAsAI, clearTranscript, startListening, state]);
 
   const handleManualSend = () => {
     if (!manualAnswer.trim() || isBusy) return;
-    voice.stopListening();
-    handleAnswerReady(manualAnswer);
+    stopListening();
+    handleAnswerReady(manualAnswer, "");
     setManualAnswer("");
   };
 
