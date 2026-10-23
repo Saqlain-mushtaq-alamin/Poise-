@@ -56,6 +56,8 @@ class InterviewPlan(BaseModel):
     sections: list[InterviewSection] = []
     estimated_duration_minutes: int = 45
     coverage_matrix: dict[str, list[str]] = {}
+    is_personalized: bool = True
+    warning: str | None = None
 
 
 class PlanGenerationError(RuntimeError):
