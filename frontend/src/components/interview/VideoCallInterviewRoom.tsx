@@ -14,6 +14,7 @@ import { useVoiceInterview } from "../../hooks/useVoiceInterview";
 import { CodingRound } from "../../pages/CodingRound";
 import { CodingAPI } from "../../lib/codingApi";
 import { api as sharedApi } from "../../lib/api";
+import { cleanSpeechText, unlockGlobalAudio } from "../../lib/audio-manager";
 
 interface VideoCallInterviewRoomProps {
   currentMessage: string | null;
