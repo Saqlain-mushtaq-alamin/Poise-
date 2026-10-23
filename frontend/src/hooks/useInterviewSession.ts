@@ -124,10 +124,7 @@ export function useInterviewSession(api: PoiseAPI | null): UseInterviewSessionRe
           send({ type: "WARM_UP_COMPLETE" });
           if (result.first_question) {
             send({ type: "QUESTION_DELIVERED" });
-            const promptToDeliver = result.message
-              ? `${result.message} ${result.first_question}`
-              : result.first_question;
-            setCurrentMessage(promptToDeliver);
+            setCurrentMessage(result.first_question);
           } else {
             setCurrentMessage(result.message);
           }
