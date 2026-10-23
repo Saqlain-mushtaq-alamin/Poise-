@@ -453,6 +453,17 @@ async def submit_answer(
     detail = _get_session_detail(db, session_id)
     sm = SessionStateMachine(session_id=session_id, state=detail.state)
 
+    # If the session is already completed or ended, return session_complete gracefully
+    if sm.state in ("completed", "finalized", "archived", "wrapping_up", "closing_chat") or detail.ended_at is not None:
+        _trigger_report_cache(session_id)
+        return AnswerResponse(
+            score=1.0,
+            feedback="Interview session complete.",
+            reaction=None,
+            next_action="session_complete",
+            framework_missing=[],
+        )
+
     if sm.state == "warm_up":
         try:
             sm.fire("warm_up_complete")
@@ -465,6 +476,15 @@ async def submit_answer(
     try:
         sm.fire("answer_received")
     except InvalidTransitionError as err:
+        if sm.state in ("completed", "wrapping_up", "closing_chat"):
+            _trigger_report_cache(session_id)
+            return AnswerResponse(
+                score=1.0,
+                feedback="Interview session complete.",
+                reaction=None,
+                next_action="session_complete",
+                framework_missing=[],
+            )
         raise HTTPException(status_code=400, detail=str(err)) from err
 
     open_turn = (
@@ -483,11 +503,44 @@ async def submit_answer(
             db.add(open_turn)
             db.commit()
         else:
-            raise HTTPException(status_code=400, detail="No open question awaiting an answer")
+            # All planned questions are already answered — complete the interview cleanly
+            try:
+                sm.fire("end_interview")
+                sm.fire("wrap_up_questions")
+                sm.fire("session_finalized")
+            except Exception:
+                pass
+            detail.state = sm.state
+            detail.ended_at = detail.ended_at or datetime.now(timezone.utc)
+            db.commit()
+            _trigger_report_cache(session_id)
+            return AnswerResponse(
+                score=1.0,
+                feedback="Interview complete.",
+                reaction=None,
+                next_action="session_complete",
+                framework_missing=[],
+            )
 
     planned = _current_planned_question(detail)
     if planned is None:
-        raise HTTPException(status_code=400, detail="No active plan question for this session")
+        try:
+            sm.fire("end_interview")
+            sm.fire("wrap_up_questions")
+            sm.fire("session_finalized")
+        except Exception:
+            pass
+        detail.state = sm.state
+        detail.ended_at = detail.ended_at or datetime.now(timezone.utc)
+        db.commit()
+        _trigger_report_cache(session_id)
+        return AnswerResponse(
+            score=1.0,
+            feedback="Interview complete.",
+            reaction=None,
+            next_action="session_complete",
+            framework_missing=[],
+        )
     question, _section = planned
 
     persona = get_persona(detail.persona_id)
