@@ -289,62 +289,115 @@ class InterviewPlanner:
     ) -> InterviewPlan:
         sections = []
         q_idx = 1
+        is_senior = config.difficulty in ("senior", "lead", "staff")
 
         for sec_type, budget in section_budgets.items():
             questions = []
             if sec_type == "behavioral":
-                questions.append(
-                    PlannedQuestion(
-                        id=f"q{q_idx}",
-                        text=f"Tell me about a challenging project you worked on, relevant to {jd.title}.",
-                        follow_ups=["What was your individual contribution?", "How did you measure success?"],
-                        evaluation_criteria=["Clarity", "STAR method", "Ownership"],
-                        difficulty=config.difficulty,
-                        skills_tested=["Communication", "Problem Solving"],
-                        source="behavioral_framework",
+                q_count = max(1, min(4, budget // 5))
+                beh_prompts = [
+                    (
+                        f"Tell me about a high-stakes technical initiative you drove across teams for {jd.title}."
+                        if is_senior
+                        else f"Tell me about a challenging project you delivered relevant to {jd.title}."
+                    ),
+                    (
+                        "Describe how you handled conflicting architectural priorities between engineering and product stakeholders."
+                        if is_senior
+                        else "Describe a situation where you had a disagreement with a team member. How did you resolve it?"
+                    ),
+                    (
+                        "Tell me about a time you mentored engineers through a significant architectural migration."
+                        if is_senior
+                        else "Tell me about a time you had to learn a new technology or domain quickly under tight deadlines."
+                    ),
+                ]
+                for i in range(q_count):
+                    prompt_text = beh_prompts[i % len(beh_prompts)]
+                    questions.append(
+                        PlannedQuestion(
+                            id=f"q{q_idx}",
+                            text=prompt_text,
+                            follow_ups=["What was your specific ownership?", "How did you measure impact?"],
+                            evaluation_criteria=["Clarity", "STAR method", "Strategic Ownership" if is_senior else "Ownership"],
+                            difficulty=config.difficulty,
+                            skills_tested=["Communication", "Collaboration", "Leadership" if is_senior else "Problem Solving"],
+                            source="behavioral_framework",
+                        )
                     )
-                )
-                q_idx += 1
+                    q_idx += 1
+
             elif sec_type == "technical":
-                req_skills = ", ".join(jd.required_skills[:3]) if jd.required_skills else "software engineering"
-                questions.append(
-                    PlannedQuestion(
-                        id=f"q{q_idx}",
-                        text=f"Can you explain core technical principles when working with {req_skills}?",
-                        follow_ups=["What trade-offs do you consider?", "How do you handle edge cases?"],
-                        evaluation_criteria=["Technical depth", "Trade-off analysis"],
-                        difficulty=config.difficulty,
-                        skills_tested=jd.required_skills[:3] or ["System Fundamentals"],
-                        source="jd_requirement",
+                q_count = max(1, min(5, budget // 6))
+                skills = jd.required_skills or ["System Architecture", "Performance", "Data Modeling"]
+                for i in range(q_count):
+                    skill = skills[i % len(skills)]
+                    if is_senior:
+                        q_text = f"In complex production environments using {skill}, how do you evaluate tradeoffs between latency, consistency, and operational simplicity?"
+                        eval_crit = ["Architectural Depth", "Trade-off Analysis", "Failure Modes"]
+                    else:
+                        q_text = f"Can you explain core technical principles and best practices when working with {skill}?"
+                        eval_crit = ["Technical Accuracy", "Practical Application", "Problem Solving"]
+                    questions.append(
+                        PlannedQuestion(
+                            id=f"q{q_idx}",
+                            text=q_text,
+                            follow_ups=["What trade-offs do you consider?", "How would you diagnose failures in production?"],
+                            evaluation_criteria=eval_crit,
+                            difficulty=config.difficulty,
+                            skills_tested=[skill],
+                            source="jd_requirement",
+                        )
                     )
-                )
-                q_idx += 1
+                    q_idx += 1
+
             elif sec_type == "coding":
-                questions.append(
-                    PlannedQuestion(
-                        id=f"q{q_idx}",
-                        text="Write an efficient algorithm to solve data processing tasks under memory constraints.",
-                        follow_ups=["What is the time complexity?", "Can you optimize space complexity?"],
-                        evaluation_criteria=["Code correctness", "Time & Space Complexity"],
-                        difficulty=config.difficulty,
-                        skills_tested=["Data Structures", "Algorithms"],
-                        source="jd_requirement",
+                q_count = max(1, min(3, budget // 14))
+                coding_prompts = [
+                    (
+                        "Design and implement an in-memory rate limiter supporting burst traffic with minimal memory overhead."
+                        if is_senior
+                        else "Write an efficient algorithm to process and aggregate streaming data under memory constraints."
+                    ),
+                    (
+                        "Implement a concurrent task scheduler with priority execution and dependency resolution."
+                        if is_senior
+                        else "Implement a caching layer with LRU eviction and thread-safe operations."
+                    ),
+                ]
+                for i in range(q_count):
+                    questions.append(
+                        PlannedQuestion(
+                            id=f"q{q_idx}",
+                            text=coding_prompts[i % len(coding_prompts)],
+                            follow_ups=["What is the runtime time and space complexity?", "How does this scale under concurrency?"],
+                            evaluation_criteria=["Code Correctness", "Complexity Analysis", "Concurrency Safety" if is_senior else "Edge Cases"],
+                            difficulty=config.difficulty,
+                            skills_tested=["Data Structures", "Algorithms", "Concurrency"],
+                            source="jd_requirement",
+                        )
                     )
-                )
-                q_idx += 1
+                    q_idx += 1
+
             elif sec_type == "system_design":
-                questions.append(
-                    PlannedQuestion(
-                        id=f"q{q_idx}",
-                        text=f"Design a scalable system for {jd.title} handling high concurrent traffic.",
-                        follow_ups=["How do you handle data consistency?", "Where are single points of failure?"],
-                        evaluation_criteria=["Scalability", "Reliability", "Component Design"],
-                        difficulty=config.difficulty,
-                        skills_tested=["Distributed Systems", "Architecture"],
-                        source="jd_requirement",
+                q_count = max(1, min(2, budget // 18))
+                design_prompts = [
+                    f"Design a globally distributed, fault-tolerant {jd.title} system handling 100,000 requests/sec with 99.99% availability.",
+                    f"Design a scalable real-time event streaming and analytical pipeline for {jd.title}.",
+                ]
+                for i in range(q_count):
+                    questions.append(
+                        PlannedQuestion(
+                            id=f"q{q_idx}",
+                            text=design_prompts[i % len(design_prompts)],
+                            follow_ups=["How do you handle partition tolerance?", "Where are the primary failure bottlenecks?"],
+                            evaluation_criteria=["Distributed Architecture", "Reliability", "Scalability"],
+                            difficulty=config.difficulty,
+                            skills_tested=["Distributed Systems", "High Availability", "Architecture"],
+                            source="jd_requirement",
+                        )
                     )
-                )
-                q_idx += 1
+                    q_idx += 1
 
             sections.append(
                 InterviewSection(
@@ -360,5 +413,5 @@ class InterviewPlanner:
             estimated_duration_minutes=config.duration_minutes,
             coverage_matrix={"General": [f"q{i}" for i in range(1, q_idx)]},
             is_personalized=False,
-            warning="Could not personalize interview questions using AI; loaded generic structured questions instead.",
+            warning="Could not personalize interview questions using AI; loaded structured questions scaled to your duration and difficulty.",
         )
