@@ -222,19 +222,11 @@ function FeedbackToast({
 function PhasePill({
   phase,
   machineState,
-  evaluating,
 }: {
   phase: string;
   machineState: string;
-  evaluating?: boolean;
 }) {
-  const phaseLabels: Record<string, string> = {
-    idle: "Standby",
-    "ai-speaking": "Interviewer Speaking",
-    listening: "Listening for Answer…",
-    processing: "Processing…",
-    paused: "Paused",
-  };
+  const isAISpeaking = phase === "ai-speaking";
   const stateLabel = isWarmUpState(machineState) ? "Warm-Up"
     : machineState.includes("listening") ? "Interview Q&A"
     : machineState.includes("followUp") ? "Follow-Up"
@@ -244,8 +236,8 @@ function PhasePill({
 
   return (
     <div className="vcir__phase-pill">
-      <span className={`vcir__phase-dot vcir__phase-dot--${phase}`} />
-      <span>{evaluating ? "Evaluating in background…" : (phaseLabels[phase] ?? phase)}</span>
+      <span className={`vcir__phase-dot vcir__phase-dot--${isAISpeaking ? "ai-speaking" : "listening"}`} />
+      <span>{isAISpeaking ? "Interviewer Speaking" : "Interview Q&A"}</span>
       <span className="vcir__phase-divider">·</span>
       <span className="vcir__phase-state">{stateLabel}</span>
     </div>
@@ -258,7 +250,7 @@ export function VideoCallInterviewRoom({
   currentMessage,
   lastFeedback,
   isComplete,
-  busy,
+  busy: _busy,
   machineState,
   onSubmitWarmUp,
   onSubmitAnswer,
@@ -410,7 +402,7 @@ export function VideoCallInterviewRoom({
 
   // ── Manual text send ───────────────────────────────────────────────────
   function handleManualSend() {
-    if (!manualAnswer.trim() || busy) return;
+    if (!manualAnswer.trim()) return;
     voice.stopListening();
     handleAnswerReady(manualAnswer);
     setManualAnswer("");
@@ -467,7 +459,7 @@ export function VideoCallInterviewRoom({
           <span className="vcir__top-brand-mark">P</span>
           <span>Poise Interview</span>
         </div>
-        <PhasePill phase={voice.phase} machineState={machineState} evaluating={busy} />
+        <PhasePill phase={voice.phase} machineState={machineState} />
         <div className="vcir__timer">{formatTime(timerSecs)}</div>
       </div>
 
@@ -485,32 +477,8 @@ export function VideoCallInterviewRoom({
                 {currentMessage && (
                   <div className="vcir__ai-speech-bubble">
                     <p>{currentMessage}</p>
-                    <div style={{ marginTop: "10px", display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
-                      <button
-                        type="button"
-                        id="vcir-replay-question-btn"
-                        style={{
-                          background: voice.isAISpeaking ? "rgba(99, 102, 241, 0.4)" : "rgba(255, 255, 255, 0.08)",
-                          border: "1px solid rgba(255, 255, 255, 0.2)",
-                          color: "#e2e8f0",
-                          padding: "4px 12px",
-                          borderRadius: "14px",
-                          fontSize: "0.8rem",
-                          cursor: "pointer",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "6px",
-                        }}
-                        onClick={() => {
-                          unlockGlobalAudio();
-                          const speechText = cleanSpeechText(currentMessage);
-                          voice.speakAsAI(speechText, personaVoice);
-                        }}
-                        title="Replay this question aloud"
-                      >
-                        {voice.isAISpeaking ? "🔊 Speaking…" : "🔊 Replay Question"}
-                      </button>
-                      {isWarmUp && (
+                    {isWarmUp && (
+                      <div style={{ marginTop: "10px" }}>
                         <button
                           type="button"
                           id="vcir-skip-warmup-btn"
@@ -534,8 +502,8 @@ export function VideoCallInterviewRoom({
                         >
                           ⏩ Start Interview Questions
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -757,14 +725,6 @@ export function VideoCallInterviewRoom({
           <span className="vcir__ctrl-label">End</span>
         </button>
       </div>
-
-      {/* ── Processing overlay (lighter — doesn't block End) ── */}
-      {busy && voice.phase === "processing" && (
-        <div className="vcir__loading-overlay" aria-live="polite">
-          <div className="vcir__loading-spinner" />
-          <span>AI is evaluating…</span>
-        </div>
-      )}
     </div>
   );
 }
