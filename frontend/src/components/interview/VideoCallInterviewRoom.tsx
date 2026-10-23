@@ -95,16 +95,6 @@ function isListeningPhase(s: string) {
   );
 }
 
-function isActiveSession(s: string) {
-  return (
-    s === "warmUp" ||
-    s.includes("inProgress") ||
-    s.includes("listening") ||
-    s.includes("asking") ||
-    s.includes("followUp")
-  );
-}
-
 // ── Score colour ───────────────────────────────────────────────────────────
 function scoreColor(score: number) {
   if (score >= 0.8) return "var(--color-accent-success)";

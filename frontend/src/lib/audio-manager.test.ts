@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { cleanSpeechText, getSharedAudioContext, unlockGlobalAudio } from "./audio-manager";
 
 describe("audio-manager", () => {
