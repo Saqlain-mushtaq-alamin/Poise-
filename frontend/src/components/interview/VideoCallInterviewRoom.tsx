@@ -605,9 +605,9 @@ export function VideoCallInterviewRoom({
                 <button
                   className="vcir__manual-send-btn"
                   onClick={handleManualSend}
-                  disabled={!manualAnswer.trim() || busy}
+                  disabled={!manualAnswer.trim()}
                 >
-                  {busy ? "Sending…" : "Send ↩"}
+                  Send ↩
                 </button>
               </div>
             </div>
@@ -654,7 +654,9 @@ export function VideoCallInterviewRoom({
       </div>
 
       {/* ── Feedback toast ── */}
-      {showFeedback && lastFeedback && <FeedbackToast feedback={lastFeedback} />}
+      {showFeedback && lastFeedback && (
+        <FeedbackToast feedback={lastFeedback} onClose={() => setShowFeedback(false)} />
+      )}
 
       {/* ── Bottom control bar ── */}
       <div className="vcir__bottom-bar">
