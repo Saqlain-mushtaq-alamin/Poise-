@@ -31,6 +31,7 @@ interface VideoCallInterviewRoomProps {
   personaVoice?: string;
   enableCoding?: boolean;
   sessionId?: string | null;
+  error?: string | null;
 }
 
 // ── State helpers ──────────────────────────────────────────────────────────
@@ -240,6 +241,7 @@ export function VideoCallInterviewRoom({
   personaVoice = "en-US-AvaNeural",
   enableCoding: _enableCoding = false,
   sessionId,
+  error,
 }: VideoCallInterviewRoomProps) {
   const isWarmUp = isWarmUpState(machineState);
   const canUserAnswer = isListeningPhase(machineState);
@@ -445,6 +447,62 @@ export function VideoCallInterviewRoom({
                 {currentMessage && (
                   <div className="vcir__ai-speech-bubble">
                     <p>{currentMessage}</p>
+                    <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        id="vcir-replay-voice-btn"
+                        style={{
+                          background: "rgba(255, 255, 255, 0.12)",
+                          border: "1px solid rgba(255, 255, 255, 0.25)",
+                          color: "#fff",
+                          padding: "4px 12px",
+                          borderRadius: "14px",
+                          fontSize: "0.8rem",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "5px",
+                        }}
+                        onClick={() => {
+                          voice.stopListening();
+                          voice.speakAsAI(currentMessage, personaVoice).then(() => {
+                            if (phaseRef.current !== "processing" && canUserAnswerRef.current) {
+                              voice.clearTranscript();
+                              voice.startListening();
+                            }
+                          });
+                        }}
+                        title="Hear interviewer speak this question aloud"
+                      >
+                        🔊 {voice.isAISpeaking ? "Speaking…" : "Hear Question / Replay"}
+                      </button>
+
+                      {isWarmUp && (
+                        <button
+                          type="button"
+                          id="vcir-skip-warmup-btn"
+                          style={{
+                            background: "rgba(99, 102, 241, 0.3)",
+                            border: "1px solid rgba(99, 102, 241, 0.6)",
+                            color: "#c7d2fe",
+                            padding: "4px 12px",
+                            borderRadius: "14px",
+                            fontSize: "0.8rem",
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                          }}
+                          onClick={() => {
+                            voice.stopListening();
+                            onSubmitWarmUp("Ready to begin the interview.");
+                          }}
+                          title="Skip introduction and start interview questions directly"
+                        >
+                          ⏩ Start Interview Questions
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -460,6 +518,16 @@ export function VideoCallInterviewRoom({
               )}
             </div>
           </div>
+
+          {/* ── Error banner ── */}
+          {error && (
+            <div className="vcir__mic-error-banner" role="alert" style={{ borderColor: "var(--color-accent-danger, #ef4444)" }}>
+              <div className="vcir__mic-error-header" style={{ color: "var(--color-accent-danger, #ef4444)" }}>
+                ⚠️ Notice
+              </div>
+              <pre className="vcir__mic-error-body">{error}</pre>
+            </div>
+          )}
 
           {/* ── Mic error banner ── */}
           {voice.micError && (
