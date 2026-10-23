@@ -69,4 +69,27 @@ describe("useVoiceInterview", () => {
     expect(result.current.transcript).toBe("");
     expect(result.current.interimTranscript).toBe("");
   });
+
+  it("accepts custom timers in startListening", async () => {
+    const onAnswerReady = vi.fn();
+    const { result } = renderHook(() =>
+      useVoiceInterview({
+        backendBaseUrl: "http://127.0.0.1:8000",
+        onAnswerReady,
+      })
+    );
+
+    expect(typeof result.current.startListening).toBe("function");
+    // Verify startListening is callable with dynamic timer options without throwing
+    await act(async () => {
+      // Mock getUserMedia
+      navigator.mediaDevices = {
+        getUserMedia: vi.fn().mockRejectedValue(new Error("No test mic")),
+      } as unknown as MediaDevices;
+      await result.current.startListening({ maxListenSecs: 130, silenceThresholdSecs: 5.5 });
+    });
+    // Expected graceful mic error without uncaught promise rejection
+    expect(result.current.micError).toContain("Microphone error");
+  });
 });
+
