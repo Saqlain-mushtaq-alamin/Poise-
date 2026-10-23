@@ -74,10 +74,6 @@ export default function IELTSSession({ api }: IELTSSessionProps) {
   });
 
   const {
-    phase: voicePhase,
-    transcript: voiceTranscript,
-    interimTranscript: voiceInterimTranscript,
-    isSpeaking: voiceIsSpeaking,
     speakAsAI,
     stopListening,
     clearTranscript,
