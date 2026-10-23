@@ -79,6 +79,7 @@ class Transcription:
     language: str | None
     segments: list[TranscriptionSegment]
     duration_ms: int
+    low_confidence_words: list[str] = field(default_factory=list)
 
 
 class WhisperSTT:
@@ -86,13 +87,17 @@ class WhisperSTT:
         self._tier = tier
         self._model = None
         self._loaded_model_name: str | None = None
+        self._model_override: str | None = None
 
     def set_tier(self, tier: HardwareTier) -> None:
         self._tier = tier
 
+    def set_model_override(self, model_name: str | None) -> None:
+        self._model_override = model_name
+
     @property
     def model_name(self) -> str:
-        return TIER_MODEL_MAP[self._tier]
+        return self._model_override or TIER_MODEL_MAP[self._tier]
 
     def is_model_loaded(self) -> bool:
         return self._model is not None and self._loaded_model_name == self.model_name
@@ -102,8 +107,7 @@ class WhisperSTT:
         `ModelNotAvailableError` if the library isn't installed or the
         model weights aren't present. Gracefully falls back to CPU if
         CUDA libraries (e.g. cublas64_12.dll on Windows) are missing.
-        Prioritizes high-accuracy English models (small.en, base.en) for
-        IELTS and interview practice."""
+        Multilingual models are prioritized for accent robustness."""
         if self.is_model_loaded():
             return self._model
 
@@ -113,13 +117,10 @@ class WhisperSTT:
             raise ModelNotAvailableError(self.model_name) from err
 
         candidate_names = []
-        # For English speech (IELTS and interview practice), prioritize specialized
-        # .en models (e.g. small.en, base.en) which offer significantly higher accuracy.
-        if self.model_name in ("small", "small.en", "base", "base.en", "tiny", "tiny.en"):
-            candidate_names.extend(["small.en", "base.en"])
         if self.model_name not in candidate_names:
             candidate_names.append(self.model_name)
-        for fallback in ("base.en", "base", "tiny.en", "tiny"):
+        # Prioritize multilingual models over .en for accent robustness
+        for fallback in ("large-v3-turbo", "medium", "small", "base", "tiny"):
             if fallback not in candidate_names:
                 candidate_names.append(fallback)
 
@@ -162,32 +163,48 @@ class WhisperSTT:
         self._loaded_model_name = self.model_name
         return self._model
 
-    async def transcribe_complete(self, audio_path: Path) -> Transcription:
-        """Full-file transcription with word-level timestamps — the shape
-        Phase 7 (IELTS pronunciation analysis) needs."""
+    async def transcribe_complete(
+        self,
+        audio_path: Path,
+        initial_prompt: str | None = None,
+        hotwords: str | None = None,
+    ) -> Transcription:
+        """Full-file transcription with word-level timestamps, prompt biasing,
+
+        and confidence extraction for IELTS & interview scoring."""
         import asyncio
 
         model = self._load_model()
+        prompt_str = initial_prompt or "Um, so, uh, I think, like, you know, well, actually... "
+        if hotwords and hotwords not in prompt_str:
+            prompt_str = f"{prompt_str} {hotwords}"
 
         def _do_transcribe(m):
+            kwargs = {
+                "word_timestamps": True,
+                "language": "en",
+                "beam_size": 5,
+                "best_of": 5,
+                "temperature": 0.0,
+                "vad_filter": True,
+                "vad_parameters": dict(min_silence_duration_ms=500),
+                "condition_on_previous_text": False,
+                "compression_ratio_threshold": 2.4,
+                "log_prob_threshold": -1.0,
+                "no_speech_threshold": 0.6,
+                "hallucination_silence_threshold": 2.0,
+                "initial_prompt": prompt_str,
+            }
+            if hotwords:
+                kwargs["hotwords"] = hotwords
             try:
-                return m.transcribe(
-                    str(audio_path),
-                    word_timestamps=True,
-                    language="en",
-                    beam_size=5,
-                    best_of=5,
-                    temperature=0.0,
-                    vad_filter=True,
-                    vad_parameters=dict(min_silence_duration_ms=500),
-                    condition_on_previous_text=False,
-                    compression_ratio_threshold=2.4,
-                    log_prob_threshold=-1.0,
-                    no_speech_threshold=0.6,
-                    hallucination_silence_threshold=2.0,
-                )
+                return m.transcribe(str(audio_path), **kwargs)
             except TypeError:
-                return m.transcribe(str(audio_path), word_timestamps=True, language="en")
+                try:
+                    kwargs.pop("hotwords", None)
+                    return m.transcribe(str(audio_path), **kwargs)
+                except TypeError:
+                    return m.transcribe(str(audio_path), word_timestamps=True, language="en", initial_prompt=prompt_str)
 
         def _run_transcription():
             try:
@@ -204,17 +221,25 @@ class WhisperSTT:
         raw_segments, info = await asyncio.to_thread(_run_transcription)
 
         segments: list[TranscriptionSegment] = []
+        low_confidence_words: list[str] = []
         total_duration_ms = 0
         for raw in raw_segments:
-            words = [
-                WordTimestamp(
-                    word=w.word,
-                    start_ms=int(w.start * 1000),
-                    end_ms=int(w.end * 1000),
-                    confidence=float(getattr(w, "probability", 1.0)),
+            words = []
+            for w in (raw.words or []):
+                conf = float(getattr(w, "probability", 1.0))
+                words.append(
+                    WordTimestamp(
+                        word=w.word,
+                        start_ms=int(w.start * 1000),
+                        end_ms=int(w.end * 1000),
+                        confidence=conf,
+                    )
                 )
-                for w in (raw.words or [])
-            ]
+                if conf < 0.65 and w.word.strip():
+                    clean_w = w.word.strip().lower()
+                    if clean_w not in low_confidence_words:
+                        low_confidence_words.append(clean_w)
+
             segment = TranscriptionSegment(
                 text=raw.text.strip(),
                 start_ms=int(raw.start * 1000),
@@ -233,6 +258,7 @@ class WhisperSTT:
             language=getattr(info, "language", None),
             segments=segments,
             duration_ms=total_duration_ms,
+            low_confidence_words=low_confidence_words,
         )
 
     async def transcribe_stream(
