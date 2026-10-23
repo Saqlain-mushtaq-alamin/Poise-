@@ -4,8 +4,8 @@
   "version": "1.0.0",
   "identifier": "com.poise.desktop",
   "build": {
-    "beforeDevCommand": "node -e \"const fs=require('fs'),{spawn}=require('child_process'),cwd=fs.existsSync('frontend/package.json')?'frontend':'../frontend';spawn('npm',['run','dev'],{cwd,stdio:'inherit',shell:true});\"",
-    "beforeBuildCommand": "node -e \"const fs=require('fs'),{spawnSync}=require('child_process'),cwd=fs.existsSync('frontend/package.json')?'frontend':'../frontend';process.exit(spawnSync('npm',['run','build'],{cwd,stdio:'inherit',shell:true}).status||0);\"",
+    "beforeDevCommand": "node dev.js",
+    "beforeBuildCommand": "node build.js",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../frontend/dist"
   },
