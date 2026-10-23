@@ -116,7 +116,10 @@ export function useConfidenceTracking({
           }
         }
       } catch (err) {
-        setError((err as Error).message);
+        const msg = (err as Error).message;
+        if (!msg.includes("MediaPipe Face Mesh/Pose integration is not available")) {
+          setError(msg);
+        }
       }
     }
 
