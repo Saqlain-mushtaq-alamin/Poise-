@@ -100,3 +100,51 @@ def test_stt_stream_websocket_reports_model_unavailable_gracefully(client, monke
     assert "model_name" in response
     assert response["model_name"] == "base"
 
+
+def test_transcribe_full_saves_file_and_returns_transcription(client, monkeypatch):
+    from io import BytesIO
+    from app.services.stt import Transcription, WhisperSTT
+
+    async def fake_transcribe_complete(self, audio_path, initial_prompt=None, hotwords=None):
+        return Transcription(
+            text="Well, um, I think technology is useful.",
+            language="en",
+            segments=[],
+            duration_ms=2500,
+            low_confidence_words=["useful"],
+        )
+
+    monkeypatch.setattr(WhisperSTT, "transcribe_complete", fake_transcribe_complete)
+
+    fake_wav_data = b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00\x80>\x00\x00\x00}\x00\x00\x02\x00\x10\x00data\x00\x00\x00\x00"
+    files = {"audio": ("sample.wav", BytesIO(fake_wav_data), "audio/wav")}
+    data = {"initial_prompt": "Um, uh..."}
+
+    resp = client.post("/voice/transcribe-full", files=files, data=data)
+    assert resp.status_code == 200
+    res = resp.json()
+    assert res["transcript"] == "Well, um, I think technology is useful."
+    assert res["duration_ms"] == 2500
+    assert "useful" in res["low_confidence_words"]
+    assert res["audio_path"].endswith(".wav")
+
+
+def test_transcribe_full_handles_missing_model_gracefully(client, monkeypatch):
+    from io import BytesIO
+    from app.services.stt import ModelNotAvailableError, WhisperSTT
+
+    async def fake_transcribe_complete(self, audio_path, initial_prompt=None, hotwords=None):
+        raise ModelNotAvailableError("large-v3-turbo")
+
+    monkeypatch.setattr(WhisperSTT, "transcribe_complete", fake_transcribe_complete)
+
+    fake_webm_data = b"\x1a\x45\xdf\xa3"
+    files = {"audio": ("recording.webm", BytesIO(fake_webm_data), "audio/webm")}
+
+    resp = client.post("/voice/transcribe-full", files=files)
+    assert resp.status_code == 200
+    res = resp.json()
+    assert res["transcript"] == ""
+    assert res["duration_ms"] == 0
+    assert res["audio_path"].endswith(".webm")
+
