@@ -332,6 +332,9 @@ export function useVoiceInterview({
 
     // Two-pass STT: Send full recorded audio to backend for high-accuracy Whisper transcription
     if (audioBlob && audioBlob.size > 0 && backendBaseUrl) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
       try {
         const formData = new FormData();
         const ext = audioBlob.type.includes("ogg") ? "ogg" : audioBlob.type.includes("wav") ? "wav" : "webm";
@@ -341,7 +344,10 @@ export function useVoiceInterview({
         const resp = await fetch(`${backendBaseUrl}/voice/transcribe-full`, {
           method: "POST",
           body: formData,
+          signal: controller.signal,
         });
+        clearTimeout(timeoutId);
+
         if (resp.ok) {
           const data = await resp.json();
           if (data.audio_path) {
@@ -351,8 +357,9 @@ export function useVoiceInterview({
             finalTranscript = data.transcript.trim();
           }
         }
-      } catch (uploadErr) {
-        console.warn("[useVoiceInterview] transcribe-full error, using streaming transcript:", uploadErr);
+      } catch (uploadErr: any) {
+        clearTimeout(timeoutId);
+        console.warn("[useVoiceInterview] transcribe-full timeout or error, using live transcript:", uploadErr?.message || uploadErr);
       }
     }
 
