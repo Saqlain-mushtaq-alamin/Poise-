@@ -139,8 +139,17 @@ See [`docs/hardware-guide.md`](./docs/hardware-guide.md) for full configuration 
      ```
    - **Full Tauri Desktop App:**
      ```bash
+     cd ..
+     npm start
+     ```
+
+     Alternatively, from `frontend/`:
+     ```bash
      npm run tauri dev
      ```
+
+     The root `npm start` command starts the Tauri desktop app, which automatically
+     starts the Vite frontend and the bundled backend sidecar.
 
 ---
 

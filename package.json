@@ -1,0 +1,8 @@
+{
+  "name": "poise",
+  "private": true,
+  "scripts": {
+    "start": "cd frontend && npm run tauri dev",
+    "tauri:dev": "cd frontend && npm run tauri dev"
+  }
+}
