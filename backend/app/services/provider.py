@@ -288,10 +288,25 @@ class ModelProviderRouter:
         import litellm
 
         litellm_model = self._litellm_model_name(model)
+        cap = get_model_capability(model)
 
         if self._is_ollama_model(model):
-            if "num_ctx" not in kwargs:
-                kwargs["num_ctx"] = 8192
+            extra_body = kwargs.setdefault("extra_body", {})
+            options = extra_body.setdefault("options", {})
+            if "options" in kwargs and isinstance(kwargs["options"], dict):
+                options.update(kwargs.pop("options"))
+            if "num_ctx" not in options:
+                options["num_ctx"] = kwargs.pop("num_ctx", cap.num_ctx)
+            if "think" not in options and cap.needs_no_think:
+                options["think"] = False
+            if "temperature" not in options and "temperature" not in kwargs:
+                options["temperature"] = cap.temperature
+
+            # Pass format="json" to Ollama when json_object response is requested
+            if kwargs.get("response_format") == {"type": "json_object"} and "format" not in kwargs:
+                kwargs["format"] = "json"
+
+        strip_thinking = kwargs.pop("strip_thinking", True)
 
         if stream:
             return self._stream_chat(litellm_model, model, messages, **kwargs)
@@ -301,7 +316,10 @@ class ModelProviderRouter:
         )
         usage = getattr(response, "usage", None)
         self.token_tracker.add_from_response_usage(model, usage)
-        return response.choices[0].message.content
+        content = response.choices[0].message.content or ""
+        if strip_thinking:
+            content = strip_thinking_tokens(content)
+        return content
 
     async def _stream_chat(
         self, litellm_model: str, tracked_model: str, messages: list[dict[str, Any]], **kwargs: Any
