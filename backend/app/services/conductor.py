@@ -157,7 +157,7 @@ class InterviewConductor:
                 model_role=ModelRole.REASONING,
                 stream=False,
                 response_format={"type": "json_object"},
-                max_tokens=800,
+                max_tokens=180,
                 timeout=25,
             )
             cleaned_response = extract_json_from_llm(raw)

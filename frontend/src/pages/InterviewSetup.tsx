@@ -143,6 +143,18 @@ export function InterviewSetup({ api }: InterviewSetupProps) {
 
     setSubmitting(true);
     setLocalError(null);
+
+    // Unlock browser audio context directly inside user click gesture for flawless autoplay
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (AudioCtx) {
+        const temp = new AudioCtx();
+        temp.resume().catch(() => {});
+      }
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.resume();
+      }
+    } catch { /* ok */ }
     try {
       const { resume_id } = await api.parseResume<{ resume_id: string }>(resumeFile);
       const { jd_id } = await api.parseJD<{ jd_id: string }>(jdText);

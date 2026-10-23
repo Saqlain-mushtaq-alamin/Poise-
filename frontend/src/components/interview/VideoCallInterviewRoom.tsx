@@ -184,25 +184,63 @@ function UserCamera({ active }: { active: boolean }) {
   );
 }
 
-function FeedbackToast({ feedback }: { feedback: { score: number; feedback: string; reaction: string | null } | null }) {
+function FeedbackToast({
+  feedback,
+  onClose,
+}: {
+  feedback: { score: number; feedback: string; reaction: string | null } | null;
+  onClose?: () => void;
+}) {
   if (!feedback) return null;
   const pct = Math.round(feedback.score * 100);
   return (
-    <div className="vcir__feedback-toast">
+    <div className="vcir__feedback-toast" role="status" aria-live="polite">
       <div className="vcir__feedback-score" style={{ color: scoreColor(feedback.score) }}>{pct}%</div>
       <div className="vcir__feedback-body">
-        {feedback.reaction && <em className="vcir__feedback-reaction">{feedback.reaction}</em>}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", gap: "8px" }}>
+          {feedback.reaction ? (
+            <em className="vcir__feedback-reaction">{feedback.reaction}</em>
+          ) : (
+            <span style={{ fontSize: "0.75rem", color: "var(--color-text-secondary, #94a3b8)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Feedback</span>
+          )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "var(--color-text-secondary, #94a3b8)",
+                cursor: "pointer",
+                padding: "0 4px",
+                fontSize: "0.85rem",
+                lineHeight: 1,
+              }}
+              title="Dismiss"
+              aria-label="Dismiss feedback"
+            >
+              ✕
+            </button>
+          )}
+        </div>
         <p className="vcir__feedback-text">{feedback.feedback}</p>
       </div>
     </div>
   );
 }
 
-function PhasePill({ phase, machineState }: { phase: string; machineState: string }) {
+function PhasePill({
+  phase,
+  machineState,
+  evaluating,
+}: {
+  phase: string;
+  machineState: string;
+  evaluating?: boolean;
+}) {
   const phaseLabels: Record<string, string> = {
     idle: "Standby",
-    "ai-speaking": "AI Speaking…",
-    listening: "Listening…",
+    "ai-speaking": "Interviewer Speaking",
+    listening: "Listening for Answer…",
     processing: "Processing…",
     paused: "Paused",
   };
@@ -216,7 +254,7 @@ function PhasePill({ phase, machineState }: { phase: string; machineState: strin
   return (
     <div className="vcir__phase-pill">
       <span className={`vcir__phase-dot vcir__phase-dot--${phase}`} />
-      <span>{phaseLabels[phase] ?? phase}</span>
+      <span>{evaluating ? "Evaluating in background…" : (phaseLabels[phase] ?? phase)}</span>
       <span className="vcir__phase-divider">·</span>
       <span className="vcir__phase-state">{stateLabel}</span>
     </div>
@@ -257,7 +295,7 @@ export function VideoCallInterviewRoom({
   const [camEnabled, setCamEnabled] = useState(true);
   const [manualAnswer, setManualAnswer] = useState("");
   const [showManualInput, setShowManualInput] = useState(false);
-  const [lastPlayedMessage, setLastPlayedMessage] = useState<string | null>(null);
+  const playedMessageRef = useRef<string | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [timerSecs, setTimerSecs] = useState(0);
   const [showCoding, setShowCoding] = useState(false);
@@ -301,32 +339,33 @@ export function VideoCallInterviewRoom({
   // Keep phaseRef in sync
   useEffect(() => { phaseRef.current = voice.phase; }, [voice.phase]);
 
-  // ── Speak AI message when it changes ──────────────────────────────────
+  // ── Auto-play AI message immediately when it changes ──────────────────
   useEffect(() => {
-    if (!currentMessage || currentMessage === lastPlayedMessage) return;
-    // Speak for warmUp, inProgress, or any active session state
+    if (!currentMessage || currentMessage === playedMessageRef.current) return;
     if (!isActiveSession(machineState) && !isWarmUpState(machineState)) return;
 
-    setLastPlayedMessage(currentMessage);
+    playedMessageRef.current = currentMessage;
     setShowFeedback(false);
 
-    if (!voiceEnabled) return; // text-only mode — just show the text
+    if (!voiceEnabled) return;
 
     voice.stopListening();
 
-    // Short delay so React state has settled
-    const t = setTimeout(async () => {
-      await voice.speakAsAI(currentMessage, personaVoice);
-      // After AI finishes speaking, start listening if it's the user's turn
-      if (phaseRef.current !== "processing" && canUserAnswerRef.current) {
+    let cancelled = false;
+
+    // Immediately trigger speakAsAI so the voice auto-plays right as the question appears
+    voice.speakAsAI(currentMessage, personaVoice).then(() => {
+      if (!cancelled && canUserAnswerRef.current) {
         voice.clearTranscript();
         voice.startListening();
       }
-    }, 300);
+    });
 
-    return () => clearTimeout(t);
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentMessage, machineState, voiceEnabled]);
+  }, [currentMessage, voiceEnabled]);
 
   // ── Feedback toast ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -429,7 +468,7 @@ export function VideoCallInterviewRoom({
           <span className="vcir__top-brand-mark">P</span>
           <span>Poise Interview</span>
         </div>
-        <PhasePill phase={voice.phase} machineState={machineState} />
+        <PhasePill phase={voice.phase} machineState={machineState} evaluating={busy} />
         <div className="vcir__timer">{formatTime(timerSecs)}</div>
       </div>
 
@@ -447,43 +486,14 @@ export function VideoCallInterviewRoom({
                 {currentMessage && (
                   <div className="vcir__ai-speech-bubble">
                     <p>{currentMessage}</p>
-                    <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
-                      <button
-                        type="button"
-                        id="vcir-replay-voice-btn"
-                        style={{
-                          background: "rgba(255, 255, 255, 0.12)",
-                          border: "1px solid rgba(255, 255, 255, 0.25)",
-                          color: "#fff",
-                          padding: "4px 12px",
-                          borderRadius: "14px",
-                          fontSize: "0.8rem",
-                          cursor: "pointer",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "5px",
-                        }}
-                        onClick={() => {
-                          voice.stopListening();
-                          voice.speakAsAI(currentMessage, personaVoice).then(() => {
-                            if (phaseRef.current !== "processing" && canUserAnswerRef.current) {
-                              voice.clearTranscript();
-                              voice.startListening();
-                            }
-                          });
-                        }}
-                        title="Hear interviewer speak this question aloud"
-                      >
-                        🔊 {voice.isAISpeaking ? "Speaking…" : "Hear Question / Replay"}
-                      </button>
-
-                      {isWarmUp && (
+                    {isWarmUp && (
+                      <div style={{ marginTop: "10px" }}>
                         <button
                           type="button"
                           id="vcir-skip-warmup-btn"
                           style={{
-                            background: "rgba(99, 102, 241, 0.3)",
-                            border: "1px solid rgba(99, 102, 241, 0.6)",
+                            background: "rgba(99, 102, 241, 0.25)",
+                            border: "1px solid rgba(99, 102, 241, 0.5)",
                             color: "#c7d2fe",
                             padding: "4px 12px",
                             borderRadius: "14px",
@@ -501,8 +511,8 @@ export function VideoCallInterviewRoom({
                         >
                           ⏩ Start Interview Questions
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
