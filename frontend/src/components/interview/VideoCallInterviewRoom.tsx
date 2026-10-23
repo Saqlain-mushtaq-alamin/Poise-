@@ -374,6 +374,19 @@ export function VideoCallInterviewRoom({
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [isComplete]);
 
+  // ── Auto-transition to scoring report when interview completes ──────────
+  useEffect(() => {
+    if (isComplete) {
+      voice.stopListening();
+      voice.cancelAISpeech();
+      const timer = setTimeout(() => {
+        if (onViewReport) onViewReport();
+        else if (onEnd) onEnd();
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [isComplete, onEnd, onViewReport]);
+
   function formatTime(s: number) {
     const m = Math.floor(s / 60);
     const sec = s % 60;
