@@ -136,13 +136,13 @@ commentary) matching this shape:
 {{
   "sections": [
     {{
-      "type": "behavioral|technical|coding|situational",
+      "type": "behavioral|technical|coding|system_design",
       "title": "...",
       "time_budget_minutes": <int, MUST match the provided skeleton for this type>,
       "questions": [
         {{
           "id": "q1", "text": "...", "follow_ups": ["..."],
-          "evaluation_criteria": ["..."], "difficulty": "easy|medium|hard",
+          "evaluation_criteria": ["..."], "difficulty": "{difficulty}",
           "skills_tested": ["..."], "source": "resume_gap|jd_requirement|behavioral_framework"
         }}
       ]
@@ -155,8 +155,21 @@ Ground every question in specifics from the resume and JD below — reference ac
 technologies, projects, or requirements. Do not write generic questions that could apply \
 to any candidate.
 
+PACING & QUESTION COUNT RULES (Strictly scale questions to time_budget_minutes):
+- Behavioral sections: allocate ~4-5 minutes per question (e.g. 10m -> 2 questions, 15m -> 3 questions).
+- Technical sections: allocate ~5-7 minutes per question (e.g. 10m -> 2 questions, 20m -> 3-4 questions).
+- Coding sections: allocate ~12-15 minutes per problem (e.g. 15m -> 1 problem, 30m -> 2 problems).
+- System design sections: allocate ~15-20 minutes per problem (e.g. 20m -> 1 problem, 35m -> 2 problems).
+Generate an appropriate number of distinct questions per section to fill the allotted time budget.
+
+DIFFICULTY CALIBRATION ({difficulty}):
+- junior: Focus on foundational concepts, language syntax, clean code basics, standard algorithms, and clear requirements.
+- mid: Focus on practical tradeoffs, real-world edge cases, component interaction, debugging, and independent delivery.
+- senior: Focus on architectural decisions, performance bottlenecks, concurrency, resilience, and ambiguous requirements.
+- lead / staff: Focus on distributed systems scale, organization-level impact, technical strategy, and failure domains.
+
 Section time budgets (minutes): {section_budgets}
-Difficulty: {difficulty}
+Target Difficulty: {difficulty}
 Company format: {company_format_note}
 
 RESUME SUMMARY:
