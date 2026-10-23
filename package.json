@@ -2,7 +2,9 @@
   "name": "poise",
   "private": true,
   "scripts": {
-    "start": "cd src-tauri && cargo tauri dev",
-    "tauri:dev": "cd src-tauri && cargo tauri dev"
+    "start": "cargo tauri dev",
+    "tauri:dev": "cargo tauri dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "cd backend && python -m app.main"
   }
 }
