@@ -81,6 +81,8 @@ export function useVoiceInterview({
   const aiAudioRef = useRef<HTMLAudioElement | null>(null);
   const aiBlobUrlRef = useRef<string | null>(null);
   const aiLevelRafRef = useRef<number>(0);
+  const speakerCtxRef = useRef<AudioContext | null>(null);
+  const activeSourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
 
   const micCtxRef = useRef<AudioContext | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
@@ -132,10 +134,45 @@ export function useVoiceInterview({
     setSpeechApiAvailable(!!SR);
   }, []);
 
-  // ---- AI audio level (simulated for visualizer without muting HTMLAudioElement) ----
+  // Un-suspend AudioContext on any user interaction (click or keypress)
+  useEffect(() => {
+    const unlock = () => {
+      if (speakerCtxRef.current && speakerCtxRef.current.state === "suspended") {
+        speakerCtxRef.current.resume().catch(() => {});
+      }
+      if (micCtxRef.current && micCtxRef.current.state === "suspended") {
+        micCtxRef.current.resume().catch(() => {});
+      }
+    };
+    window.addEventListener("click", unlock, { passive: true });
+    window.addEventListener("keydown", unlock, { passive: true });
+    return () => {
+      window.removeEventListener("click", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
+
+  // ---- AI audio level (analyser-driven for Web Audio + simulation fallback for HTMLAudio) ----
   function stopAILevelPoll() {
     cancelAnimationFrame(aiLevelRafRef.current);
     setAiAudioLevel(0);
+  }
+
+  function startAILevelPollFromAnalyser(analyser: AnalyserNode) {
+    stopAILevelPoll();
+    const data = new Uint8Array(analyser.fftSize);
+    function tick() {
+      analyser.getByteTimeDomainData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) {
+        const n = (data[i] - 128) / 128;
+        sum += n * n;
+      }
+      const level = Math.min(Math.sqrt(sum / data.length) * 5, 1);
+      setAiAudioLevel(level);
+      aiLevelRafRef.current = requestAnimationFrame(tick);
+    }
+    tick();
   }
 
   function startAILevelPoll(audio: HTMLAudioElement) {
@@ -198,6 +235,10 @@ export function useVoiceInterview({
   // ---- Speak as AI ----
   const cancelAISpeech = useCallback(() => {
     stopAILevelPoll();
+    if (activeSourceNodeRef.current) {
+      try { activeSourceNodeRef.current.stop(); } catch { /* ok */ }
+      activeSourceNodeRef.current = null;
+    }
     // Cancel browser TTS too
     if (typeof window !== "undefined" && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -221,7 +262,7 @@ export function useVoiceInterview({
 
     let backendSucceeded = false;
 
-    // 1. Try Backend Audio (WAV/TTS from backend)
+    // 1. Try Backend Audio (Web Audio API direct decoding + HTMLAudio fallback)
     try {
       if (backendBaseUrl) {
         const url = `${backendBaseUrl}/voice/tts/synthesize`;
@@ -232,47 +273,81 @@ export function useVoiceInterview({
         });
 
         if (res.ok) {
-          const blob = await res.blob();
-          if (blob.size > 100) {
-            const blobUrl = URL.createObjectURL(blob);
-            aiBlobUrlRef.current = blobUrl;
-            const audio = new Audio(blobUrl);
-            audio.volume = 1.0;
-            aiAudioRef.current = audio;
+          const arrayBuffer = await res.arrayBuffer();
+          if (arrayBuffer.byteLength > 100) {
+            // First attempt: Web Audio API (unlocked, pristine PCM playback directly to hardware)
+            try {
+              const AudioCtxClass =
+                window.AudioContext ||
+                (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+              if (!speakerCtxRef.current || speakerCtxRef.current.state === "closed") {
+                speakerCtxRef.current = new AudioCtxClass();
+              }
+              const ctx = speakerCtxRef.current;
+              if (ctx.state === "suspended") {
+                await ctx.resume().catch(() => {});
+              }
 
-            await new Promise<void>((resolve) => {
-              let done = false;
-              const finish = (success: boolean) => {
-                if (done) return;
-                done = true;
-                stopAILevelPoll();
-                if (success) backendSucceeded = true;
-                if (aiBlobUrlRef.current) {
-                  URL.revokeObjectURL(aiBlobUrlRef.current);
-                  aiBlobUrlRef.current = null;
-                }
-                aiAudioRef.current = null;
-                resolve();
-              };
+              // decodeAudioData consumes the buffer, so pass a clone
+              const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+              const source = ctx.createBufferSource();
+              source.buffer = audioBuffer;
 
-              audio.onended = () => finish(true);
-              audio.onerror = () => finish(false);
+              const analyser = ctx.createAnalyser();
+              analyser.fftSize = 256;
+              source.connect(analyser);
+              analyser.connect(ctx.destination);
+              activeSourceNodeRef.current = source;
 
-              startAILevelPoll(audio);
-              audio.play().then(() => {
-                // If after 5s audio hasn't progressed, fallback to browser TTS
-                setTimeout(() => {
-                  if (!done && audio.currentTime <= 0.01) {
-                    console.warn("[TTS] Audio playback stalled, falling back to browser TTS");
-                    audio.pause();
-                    finish(false);
-                  }
-                }, 5000);
-              }).catch((err) => {
-                console.warn("[TTS] audio.play() blocked/failed:", err);
-                finish(false);
+              startAILevelPollFromAnalyser(analyser);
+
+              await new Promise<void>((resolve) => {
+                source.onended = () => {
+                  stopAILevelPoll();
+                  activeSourceNodeRef.current = null;
+                  resolve();
+                };
+                source.start(0);
               });
-            });
+              backendSucceeded = true;
+            } catch (webAudioErr) {
+              console.warn("[TTS] Web Audio playback failed, falling back to HTMLAudioElement:", webAudioErr);
+            }
+
+            // Fallback attempt: HTMLAudioElement with blob URL
+            if (!backendSucceeded) {
+              const blob = new Blob([arrayBuffer], { type: "audio/mpeg" });
+              const blobUrl = URL.createObjectURL(blob);
+              aiBlobUrlRef.current = blobUrl;
+              const audio = new Audio(blobUrl);
+              audio.volume = 1.0;
+              aiAudioRef.current = audio;
+
+              await new Promise<void>((resolve) => {
+                let done = false;
+                const finish = (success: boolean) => {
+                  if (done) return;
+                  done = true;
+                  stopAILevelPoll();
+                  if (success) backendSucceeded = true;
+                  if (aiBlobUrlRef.current) {
+                    URL.revokeObjectURL(aiBlobUrlRef.current);
+                    aiBlobUrlRef.current = null;
+                  }
+                  aiAudioRef.current = null;
+                  resolve();
+                };
+
+                audio.onended = () => finish(true);
+                audio.onerror = () => finish(false);
+
+                startAILevelPoll(audio);
+                audio.play().catch((err) => {
+                  console.warn("[TTS] audio.play() failed:", err);
+                  finish(false);
+                });
+              });
+            }
           }
         }
       }
@@ -280,7 +355,7 @@ export function useVoiceInterview({
       console.warn("[useVoiceInterview] Backend TTS failed:", err);
     }
 
-    // 2. Fallback: Browser SpeechSynthesis (guaranteed output on Windows / BT headphones)
+    // 2. Fallback: Browser SpeechSynthesis
     if (!backendSucceeded) {
       console.info("[TTS] Using browser speechSynthesis fallback for message:", text.slice(0, 30));
       setPhase("ai-speaking");
