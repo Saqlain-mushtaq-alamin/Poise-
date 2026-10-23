@@ -273,3 +273,66 @@ async def download_stt_model(stt: WhisperSTT = Depends(get_stt)) -> dict:
     loop.run_in_executor(executor, _do_download)
 
     return {"status": "downloading", "model_name": model_name}
+
+
+class TranscribeFullResponse(BaseModel):
+    audio_path: str
+    transcript: str
+    duration_ms: int
+    low_confidence_words: list[str] = []
+    language: str | None = None
+
+
+@router.post("/transcribe-full", response_model=TranscribeFullResponse)
+async def transcribe_full(
+    audio: UploadFile = File(...),
+    initial_prompt: str | None = Form(None),
+    hotwords: str | None = Form(None),
+    stt: WhisperSTT = Depends(get_stt),
+    settings: Settings = Depends(get_settings),
+) -> TranscribeFullResponse:
+    """Accept an uploaded audio recording, save it to disk in audio_uploads,
+    and run complete high-accuracy Whisper transcription with filler word
+    preservation and word-level confidence tracking.
+    """
+    upload_dir = settings.data_dir / "audio_uploads"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    ext = Path(audio.filename or "recording.webm").suffix or ".webm"
+    unique_name = f"{uuid.uuid4().hex}{ext}"
+    dest_path = upload_dir / unique_name
+
+    content = await audio.read()
+    dest_path.write_bytes(content)
+
+    try:
+        result = await stt.transcribe_complete(
+            dest_path,
+            initial_prompt=initial_prompt,
+            hotwords=hotwords,
+        )
+        return TranscribeFullResponse(
+            audio_path=str(dest_path.resolve()),
+            transcript=result.text,
+            duration_ms=result.duration_ms,
+            low_confidence_words=result.low_confidence_words,
+            language=result.language,
+        )
+    except ModelNotAvailableError as err:
+        logger.warning("Whisper model not available for full transcription: %s", err)
+        return TranscribeFullResponse(
+            audio_path=str(dest_path.resolve()),
+            transcript="",
+            duration_ms=0,
+            low_confidence_words=[],
+            language=None,
+        )
+    except Exception as exc:
+        logger.warning("Full transcription failed (%s), returning saved audio path", exc)
+        return TranscribeFullResponse(
+            audio_path=str(dest_path.resolve()),
+            transcript="",
+            duration_ms=0,
+            low_confidence_words=[],
+            language=None,
+        )

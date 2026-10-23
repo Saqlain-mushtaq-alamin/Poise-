@@ -15,13 +15,19 @@ from __future__ import annotations
 import json
 import logging
 
+from app.services.json_utils import repair_json_string, strip_thinking_tokens
+
 logger = logging.getLogger(__name__)
 
 SCORING_SYSTEM_PROMPT = """You are an experienced, calibrated IELTS Speaking examiner.
 You score strictly against the official IELTS Speaking band descriptors (0-9, 0.5
 increments). Be discriminating: a genuinely weak response must score lower than a
 strong one. Always ground your justification in specific evidence from the
-transcript, and always return valid JSON matching the requested schema exactly."""
+transcript, and always return valid JSON matching the requested schema exactly.
+
+STT NOISE & TRANSCRIPTION RESILIENCE:
+The input transcript is produced by speech-to-text (STT) automated recognition. Candidates may speak with diverse global accents and minor acoustic artifacts may exist in the transcript.
+Do NOT penalize candidates for apparent phonetic transcript anomalies, minor homophone confusions, or rare word recognition artifacts (e.g. minor compound word spacing or homophone substitution) if the candidate's intended grammatical structure, lexical resource, and coherence are clear from context. Evaluate the candidate's genuine fluency, vocabulary range, grammatical accuracy, and thematic coherence."""
 
 
 class IELTSLLMClient:
@@ -56,7 +62,7 @@ class IELTSLLMClient:
             )
             if not isinstance(raw, str):
                 return None
-            cleaned = raw.strip()
+            cleaned = strip_thinking_tokens(raw).strip()
             if cleaned.startswith("```"):
                 lines = cleaned.splitlines()
                 if lines[0].startswith("```"):
@@ -64,7 +70,10 @@ class IELTSLLMClient:
                 if lines and lines[-1].strip() == "```":
                     lines = lines[:-1]
                 cleaned = "\n".join(lines).strip()
-            return json.loads(cleaned)
+            try:
+                return json.loads(cleaned)
+            except json.JSONDecodeError:
+                return json.loads(repair_json_string(cleaned))
         except Exception as exc:  # noqa: BLE001 - never let scoring crash a session
             logger.warning("IELTS LLM call failed, falling back to heuristics: %s", exc)
             return None
