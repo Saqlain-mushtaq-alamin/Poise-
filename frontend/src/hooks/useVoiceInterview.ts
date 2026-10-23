@@ -260,14 +260,14 @@ export function useVoiceInterview({
 
               startAILevelPoll(audio);
               audio.play().then(() => {
-                // If after 1.2s audio hasn't progressed, fallback to browser TTS
+                // If after 5s audio hasn't progressed, fallback to browser TTS
                 setTimeout(() => {
                   if (!done && audio.currentTime <= 0.01) {
                     console.warn("[TTS] Audio playback stalled, falling back to browser TTS");
                     audio.pause();
                     finish(false);
                   }
-                }, 1200);
+                }, 5000);
               }).catch((err) => {
                 console.warn("[TTS] audio.play() blocked/failed:", err);
                 finish(false);
