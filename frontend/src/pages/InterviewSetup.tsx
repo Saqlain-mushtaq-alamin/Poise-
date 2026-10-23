@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 
 import { VideoCallInterviewRoom } from "../components/interview/VideoCallInterviewRoom";
 import { useInterviewSession } from "../hooks/useInterviewSession";
+import { unlockGlobalAudio } from "../lib/audio-manager";
 import type { PoiseAPI } from "../lib/api";
 import type { CompanyFormat, InterviewConfig, Persona } from "../lib/types";
 
@@ -145,16 +146,7 @@ export function InterviewSetup({ api }: InterviewSetupProps) {
     setLocalError(null);
 
     // Unlock browser audio context directly inside user click gesture for flawless autoplay
-    try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) {
-        const temp = new AudioCtx();
-        temp.resume().catch(() => {});
-      }
-      if (typeof window !== "undefined" && window.speechSynthesis) {
-        window.speechSynthesis.resume();
-      }
-    } catch { /* ok */ }
+    unlockGlobalAudio();
     try {
       const { resume_id } = await api.parseResume<{ resume_id: string }>(resumeFile);
       const { jd_id } = await api.parseJD<{ jd_id: string }>(jdText);
