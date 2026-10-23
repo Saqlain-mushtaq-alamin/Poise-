@@ -136,7 +136,9 @@ fn spawn_with_restarts(app: AppHandle, attempt: u32) {
             Ok(pair) => pair,
             Err(err) => {
                 tracing::error!("failed to spawn sidecar: {err}");
-                maybe_restart(app, attempt);
+                if !manager.is_shutting_down() {
+                    maybe_restart(app, attempt);
+                }
                 return;
             }
         };
@@ -170,7 +172,11 @@ fn spawn_with_restarts(app: AppHandle, attempt: u32) {
                 CommandEvent::Terminated(payload) => {
                     tracing::warn!("sidecar exited with {:?}", payload.code);
                     manager.set_state(SidecarState::Stopped);
-                    maybe_restart(app.clone(), attempt);
+                    if !manager.is_shutting_down() {
+                        maybe_restart(app.clone(), attempt);
+                    } else {
+                        tracing::info!("sidecar terminated during application shutdown; skipping restart");
+                    }
                     break;
                 }
                 _ => {}
@@ -180,6 +186,11 @@ fn spawn_with_restarts(app: AppHandle, attempt: u32) {
 }
 
 fn maybe_restart(app: AppHandle, attempt: u32) {
+    let manager: State<SidecarManager> = app.state();
+    if manager.is_shutting_down() {
+        tracing::info!("aborting sidecar restart because application is shutting down");
+        return;
+    }
     if attempt >= MAX_RESTART_ATTEMPTS {
         tracing::error!("sidecar failed {MAX_RESTART_ATTEMPTS} times; giving up");
         // The frontend's StatusBar reflects `Stopped` via polling / events;
@@ -187,7 +198,6 @@ fn maybe_restart(app: AppHandle, attempt: u32) {
         // once that dependency is added.
         return;
     }
-    let manager: State<SidecarManager> = app.state();
     let count = manager.increment_restart();
     tracing::info!("restarting sidecar (attempt {count})");
     spawn_with_restarts(app, attempt + 1);
@@ -203,6 +213,20 @@ async fn health_check_loop(app: AppHandle, port: u16) {
     let mut consecutive_failures = 0u32;
 
     loop {
+        if manager.is_shutting_down() {
+            tracing::debug!("health check loop terminating: application is shutting down");
+            break;
+        }
+        let snapshot = manager.snapshot();
+        if snapshot.status == SidecarState::Stopped {
+            tracing::debug!("health check loop terminating: sidecar is stopped");
+            break;
+        }
+        if snapshot.port != port {
+            tracing::debug!("health check loop terminating: port switched from {port} to {}", snapshot.port);
+            break;
+        }
+
         let healthy = client
             .get(format!("http://127.0.0.1:{port}/health"))
             .send()
@@ -247,6 +271,9 @@ fn parse_port_line(output: &str) -> Option<u16> {
 /// own shutdown work.
 pub async fn shutdown(app: &AppHandle) {
     let manager: State<SidecarManager> = app.state();
+    manager.set_shutting_down();
+    manager.set_state(SidecarState::Stopped);
+
     let child = manager.child.lock().unwrap().take();
 
     if let Some(child) = child {
@@ -256,7 +283,6 @@ pub async fn shutdown(app: &AppHandle) {
         }
     }
 
-    manager.set_state(SidecarState::Stopped);
     sleep(SHUTDOWN_GRACE_PERIOD.min(Duration::from_millis(50))).await;
 }
 
@@ -281,5 +307,14 @@ mod tests {
         let status = manager.snapshot();
         assert_eq!(status.status, SidecarState::Starting);
         assert_eq!(status.restart_count, 0);
+        assert!(!manager.is_shutting_down());
+    }
+
+    #[test]
+    fn manager_tracks_shutting_down_state() {
+        let manager = SidecarManager::default();
+        assert!(!manager.is_shutting_down());
+        manager.set_shutting_down();
+        assert!(manager.is_shutting_down());
     }
 }
