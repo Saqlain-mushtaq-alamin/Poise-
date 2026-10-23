@@ -69,7 +69,11 @@ async def test_generate_followup_timeout_configured_to_6s():
     mock_db = mock.MagicMock()
     conductor = IELTSSessionConductor(db=mock_db, llm_client=FakeLLMClient())
 
-    with mock.patch("asyncio.wait_for") as mock_wait_for:
-        mock_wait_for.return_value = "Followup"
-        await conductor._generate_followup("Some answer", 3, "technology")
+    async def fake_wait_for(coro, timeout):
+        await coro
+        return "Followup"
+
+    with mock.patch("asyncio.wait_for", side_effect=fake_wait_for) as mock_wait_for:
+        result = await conductor._generate_followup("Some answer", 3, "technology")
+        assert result == "Followup"
         assert mock_wait_for.call_args[1]["timeout"] == 6.0
