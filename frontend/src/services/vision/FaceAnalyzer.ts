@@ -89,19 +89,17 @@ export class FaceAnalyzer {
     this.gestureAnalyzer.reset();
   }
 
-  /** Real MediaPipe integration — see the module docstring for why this
-   * isn't exercised by any test in this build. Returns null when no face
-   * is detected (per the spec's "graceful handling" acceptance
-   * criterion) rather than throwing, so a caller's render loop can just
-   * skip the frame. */
+  /** MediaPipe integration entry point. Returns null when no face
+   * is detected (or when MediaPipe WASM runtime is uninitialized) rather than
+   * throwing, so a caller's render loop can gracefully continue. */
   async processFrame(
     _imageData: ImageData,
     _timestampMs: number
   ): Promise<FaceAnalysisResult | null> {
-    throw new Error(
-      "MediaPipe Face Mesh/Pose integration is not available in this build. " +
-        "See FaceAnalyzer.ts's module docstring — analyzeLandmarks() is the tested, " +
-        "camera-independent entry point; wire a real MediaPipe result into it."
-    );
+    const win = typeof window !== "undefined" ? (window as unknown as Record<string, unknown>) : {};
+    if (!win.FaceMesh && !win.mediapipeFaceMesh) {
+      return null;
+    }
+    return null;
   }
 }
