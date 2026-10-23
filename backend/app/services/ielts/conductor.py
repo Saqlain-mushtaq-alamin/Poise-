@@ -238,28 +238,45 @@ class IELTSSessionConductor:
 
         elif machine.state == IELTSState.PART3_DISCUSSION:
             questions = row.part3_questions or []
-            if row.part3_index + 1 < len(questions):
-                row.part3_index += 1
-                # Occasionally insert a contextual follow-up (~40% chance)
+            had_followup = bool(getattr(row, "dynamic_followup", None))
+
+            if had_followup:
+                # The candidate just answered a dynamic follow-up probe.
+                # Clear the follow-up and advance to the next bank question.
+                row.dynamic_followup = None
+                if row.part3_index + 1 < len(questions):
+                    row.part3_index += 1
+                else:
+                    transition = machine.advance()  # -> SCORING
+                    row.status = transition.to_state.value
+            else:
+                # Candidate just answered bank question at row.part3_index.
+                # Probing opportunity (~40% chance).
+                followup_generated = False
                 if random.random() < 0.4:
                     theme = (row.part2_cue_card or {}).get("theme", "")
                     followup = await self._generate_followup(last_answer, part=3, theme=theme)
                     if followup:
                         row.dynamic_followup = followup
-            else:
-                transition = machine.advance()  # -> SCORING
-                row.status = transition.to_state.value
-                row.dynamic_followup = None
+                        followup_generated = True
+
+                if not followup_generated:
+                    # No follow-up probe; advance to next bank question.
+                    if row.part3_index + 1 < len(questions):
+                        row.part3_index += 1
+                    else:
+                        transition = machine.advance()  # -> SCORING
+                        row.status = transition.to_state.value
 
         return self._current_prompt(row)
 
     async def _generate_followup(self, answer: str, part: int, theme: str) -> str | None:
-        """Generate a contextual follow-up via LLM, with graceful fallback and strict timeout."""
+        """Generate a contextual follow-up via LLM, with graceful fallback and realistic timeout."""
         import asyncio
         try:
             result = await asyncio.wait_for(
                 self.llm_client.generate_followup(answer, part, theme),
-                timeout=2.5,
+                timeout=6.0,
             )
             return result
         except Exception as exc:
@@ -275,10 +292,9 @@ class IELTSSessionConductor:
         if state == IELTSState.PART2_FOLLOW_UP:
             return 2, row.dynamic_followup or "Now, let's talk about the topic a little more generally."
         if state == IELTSState.PART3_DISCUSSION:
-            # Serve dynamic follow-up if one exists, otherwise serve bank question
+            # Serve dynamic follow-up if one exists, otherwise serve bank question (read-only query)
             followup = getattr(row, "dynamic_followup", None)
             if followup:
-                row.dynamic_followup = None  # consume it
                 return 3, followup
             return 3, (row.part3_questions or [])[row.part3_index]
         raise ValueError(f"No question mapped for state {state}")
